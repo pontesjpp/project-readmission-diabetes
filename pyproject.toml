@@ -1,0 +1,38 @@
+[project]
+name = "project-si5"
+version = "0.1.0"
+description = "IF1014 — Mineração de Dados Aplicada com CRISP-DM. Classificação de readmissão hospitalar (Diabetes 130-US Hospitals)."
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "numpy>=1.26",
+    "pandas>=2.2",
+    "pyarrow>=16.0",
+    "scikit-learn>=1.5",
+    "scipy>=1.13",
+    "matplotlib>=3.8",
+    "seaborn>=0.13",
+    "ucimlrepo>=0.0.7",
+    "imbalanced-learn>=0.12",
+    "xgboost>=2.0",
+    "lightgbm>=4.3",
+    "sklvq>=0.1.2",
+    "jupyterlab>=4.2",
+    "ipykernel>=6.29",
+    "nbconvert>=7.16",
+    "tqdm>=4.66",
+    "joblib>=1.4",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.5",
+    "pytest>=8.2",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "W"]
+ignore = ["E501"]

@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+*.egg-info/
+
+# Jupyter
+.ipynb_checkpoints/
+main.executed.ipynb
+
+# Dados
+data/raw/*.parquet
+data/raw/*.csv
+data/interim/*.parquet
+data/processed/*.parquet
+!data/raw/.gitkeep
+!data/interim/.gitkeep
+!data/processed/.gitkeep
+
+# IDE
+.vscode/
+.idea/
