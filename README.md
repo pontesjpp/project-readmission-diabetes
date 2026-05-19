@@ -42,7 +42,4 @@ Qualquer outra chamada (ex.: `load_test('peek')`) levanta `PermissionError` — 
 # Lint / format
 uv run ruff check src/ main.ipynb
 uv run ruff format src/
-
-# Rebuild do main.ipynb (após editar scripts/build_main_notebook.py)
-uv run python scripts/build_main_notebook.py
 ```
