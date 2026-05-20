@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 import pickle
 import random
+from functools import lru_cache
 from pathlib import Path
 
 import numpy as np
@@ -64,3 +65,35 @@ def load_label_encoder() -> LabelEncoder:
         with open(LABEL_ENCODER_PATH, 'rb') as f:
             return pickle.load(f)
     return None
+
+
+@lru_cache(maxsize=1)
+def cuda_available() -> bool:
+    """Detecta se há GPU CUDA utilizável pelos modelos (hoje, XGBoost).
+
+    A checagem casa o build do XGBoost (`USE_CUDA`) com um fit mínimo em
+    `device="cuda"`. Resultado é cacheado para não pagar o smoke test toda vez.
+    """
+    try:
+        import xgboost as xgb
+    except ImportError:
+        return False
+    if not xgb.build_info().get("USE_CUDA"):
+        return False
+    try:
+        X = np.zeros((8, 2), dtype=np.float32)
+        y = np.array([0, 1, 0, 1, 0, 1, 0, 1])
+        xgb.XGBClassifier(
+            device="cuda",
+            tree_method="hist",
+            n_estimators=1,
+            verbosity=0,
+        ).fit(X, y)
+    except Exception:
+        return False
+    return True
+
+
+def get_device() -> str:
+    """Retorna `"cuda"` se há GPU utilizável, senão `"cpu"`."""
+    return "cuda" if cuda_available() else "cpu"

@@ -23,7 +23,7 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.tree import DecisionTreeClassifier
 
-from .utils import RANDOM_STATE
+from .utils import RANDOM_STATE, get_device
 
 PrepFactory = Callable[[], Any]
 ModelFactory = Callable[[PrepFactory], Pipeline]
@@ -177,6 +177,7 @@ def _make_xgboost(prep_factory: PrepFactory) -> Pipeline:
             random_state=RANDOM_STATE,
             n_jobs=2,
             tree_method="hist",
+            device=get_device(),
             eval_metric="mlogloss",
         ),
     )
