@@ -7,11 +7,13 @@ pareadas (mesmos folds, mesmo random_state) e reprodutibilidade.
 from __future__ import annotations
 
 import os
+import pickle
 import random
 from pathlib import Path
 
 import numpy as np
 from sklearn.model_selection import StratifiedKFold
+from sklearn.preprocessing import LabelEncoder
 
 RANDOM_STATE = 42
 N_FOLDS = 5
@@ -44,3 +46,21 @@ def get_cv(n_splits: int = N_FOLDS, random_state: int = RANDOM_STATE) -> Stratif
 def ensure_dirs() -> None:
     for p in (DATA_RAW, DATA_INTERIM, DATA_PROCESSED, FIGURES, CV_RESULTS):
         p.mkdir(parents=True, exist_ok=True)
+
+
+LABEL_ENCODER_PATH = DATA_PROCESSED / "label_encoder.pkl"
+
+
+def save_label_encoder(le: LabelEncoder) -> None:
+    """Persiste o LabelEncoder em disco para uso posterior."""
+    ensure_dirs()
+    with open(LABEL_ENCODER_PATH, 'wb') as f:
+        pickle.dump(le, f)
+
+
+def load_label_encoder() -> LabelEncoder:
+    """Carrega o LabelEncoder persistido, ou None se não existe."""
+    if LABEL_ENCODER_PATH.exists():
+        with open(LABEL_ENCODER_PATH, 'rb') as f:
+            return pickle.load(f)
+    return None

@@ -155,11 +155,25 @@ MLP_GRID: dict[str, list[Any]] = {
 
 
 def _make_xgboost(prep_factory: PrepFactory) -> Pipeline:
+    from sklearn.preprocessing import LabelEncoder
     from xgboost import XGBClassifier
+
+    class _XGBStringLabel(XGBClassifier):
+        """XGBClassifier wrapper that accepts string class labels."""
+
+        def fit(self, X, y, **kw):
+            self._le = LabelEncoder()
+            return super().fit(X, self._le.fit_transform(y), **kw)
+
+        def predict(self, X):
+            return self._le.inverse_transform(super().predict(X))
+
+        def predict_proba(self, X):
+            return super().predict_proba(X)
 
     return _wrap(
         prep_factory,
-        XGBClassifier(
+        _XGBStringLabel(
             random_state=RANDOM_STATE,
             n_jobs=2,
             tree_method="hist",
@@ -387,6 +401,7 @@ MODEL_REGISTRY: dict[str, ModelSpec] = {
         param_grid=XGB_GRID,
         search="randomized",
         n_iter=10,
+        enabled_for_checkpoint=True,
         notes="XGBoost com tree_method=hist.",
     ),
     # "lvq": EM STANDBY — sklvq 0.1.2 incompatível com sklearn 1.8 em n_jobs>1.
