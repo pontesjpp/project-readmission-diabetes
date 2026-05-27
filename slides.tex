@@ -168,10 +168,10 @@ LVQ (GLVQ)           & 0.2648 & 0.0024 & 0.00 \\
 \footnotesize Cada barra = média dos 5 folds da melhor configuração de HP da combinação modelo × pré-processamento. Eixo Y começa em 0.20 pra evidenciar variação.
 \end{frame}
 
-\begin{frame}{Comparação baseline vs variantes — Wilcoxon e paired t}
-\textbf{Critério de promoção:} diferença positiva \emph{e} p<0.05 em Wilcoxon ou paired t-test (5 folds pareados, mesmos folds entre baseline e variante).
+\begin{frame}[shrink=5]{Comparação baseline vs variantes — resultados significativos}
+\textbf{Critério:} p$<$0.05 em paired t-test (5 folds pareados). Wilcoxon com 5 folds é \emph{conservador} (p mín.\ = 0.0625, nunca atinge 0.05).
 
-\vspace{0.4em}
+\vspace{0.2em}
 \centering
 \tiny
 \begin{tabular}{llrrcrr}
@@ -179,48 +179,71 @@ LVQ (GLVQ)           & 0.2648 & 0.0024 & 0.00 \\
 \textbf{Modelo} & \textbf{Variante} & $F1_{\text{base}}$ & $F1_{\text{var}}$ & $\Delta$ & wilcoxon p & paired-t p \\
 \midrule
 \rowcolor{green!10}
-LVQ           & \textbf{Undersample} & 0.2648 & \textbf{0.4168} & \textbf{+0.1520} & 0.063 & \textbf{$<$0.001}$^{*}$ \\
+LVQ           & \textbf{Undersample} & 0.2648 & \textbf{0.4168} & \textbf{+0.152} & 0.062 & \textbf{$<$0.001}$^{*}$ \\
 \rowcolor{green!10}
-LVQ           & SMOTE        & 0.2648 & \textbf{0.3921} & \textbf{+0.1273} & 0.063 & \textbf{$<$0.001}$^{*}$ \\
+LVQ           & SMOTE        & 0.2648 & 0.3921 & +0.127 & 0.062 & \textbf{$<$0.001}$^{*}$ \\
 \rowcolor{green!10}
-Decision Tree & SMOTE        & 0.4012 & \textbf{0.4190} & \textbf{+0.0178} & 0.063 & \textbf{0.007}$^{*}$ \\
+Decision Tree & SMOTE        & 0.4012 & 0.4190 & +0.018 & 0.062 & \textbf{0.007}$^{*}$ \\
 \rowcolor{green!10}
-LVQ           & TargetEnc    & 0.2648 & 0.2721 & \textbf{+0.0072} & 0.063 & \textbf{$<$0.001}$^{*}$ \\
+LVQ           & TargetEnc    & 0.2648 & 0.2721 & +0.007 & 0.062 & \textbf{0.001}$^{*}$ \\
 \rowcolor{green!10}
-LVQ           & RobustScaler & 0.2648 & 0.2719 & \textbf{+0.0071} & 0.063 & \textbf{0.003}$^{*}$ \\
+LVQ           & RobustScaler & 0.2648 & 0.2719 & +0.007 & 0.062 & \textbf{0.003}$^{*}$ \\
 \rowcolor{green!10}
-Decision Tree & TargetEnc    & 0.4012 & 0.4067 & \textbf{+0.0055} & 0.063 & \textbf{0.042}$^{*}$ \\
+Decision Tree & TargetEnc    & 0.4012 & 0.4067 & +0.006 & 0.062 & \textbf{0.042}$^{*}$ \\
 \rowcolor{green!10}
-LightGBM      & SMOTE        & 0.4204 & 0.4253 & \textbf{+0.0049} & 0.063 & \textbf{0.016}$^{*}$ \\
-\midrule
-Random Forest & RobustScaler & 0.4512 & 0.4513 & +0.0001 & 0.81 & 0.92 \\
-SVM           & RobustScaler & 0.4471 & 0.4472 & +0.0001 & 0.31 & 0.13 \\
-LightGBM      & RobustScaler & 0.4204 & 0.4208 & +0.0003 & 1.00 & 0.37 \\
-XGBoost       & RobustScaler & 0.4240 & 0.4240 & +0.0000 & 1.00 & 1.00 \\
-XGBoost       & SMOTE        & 0.4240 & 0.4259 & +0.0019 & 0.44 & 0.33 \\
+LightGBM      & SMOTE        & 0.4204 & 0.4253 & +0.005 & 0.062 & \textbf{0.016}$^{*}$ \\
 \midrule
 \rowcolor{red!10}
-Random Forest & SMOTE        & 0.4512 & 0.4298 & \textbf{--0.0214} & 0.063 & \textbf{$<$0.001}$^{*}$ \\
+Random Forest & SMOTE        & 0.4512 & 0.4298 & --0.021 & 0.062 & \textbf{$<$0.001}$^{*}$ \\
 \rowcolor{red!10}
-SVM           & SMOTE        & 0.4471 & 0.4277 & \textbf{--0.0195} & 0.063 & \textbf{$<$0.001}$^{*}$ \\
+SVM           & SMOTE        & 0.4471 & 0.4277 & --0.020 & 0.062 & \textbf{$<$0.001}$^{*}$ \\
 \rowcolor{red!10}
-Random Forest & Undersample  & 0.4512 & 0.4328 & \textbf{--0.0184} & 0.063 & \textbf{$<$0.001}$^{*}$ \\
+Random Forest & Undersample  & 0.4512 & 0.4328 & --0.018 & 0.062 & \textbf{$<$0.001}$^{*}$ \\
 \rowcolor{red!10}
-SVM           & Undersample  & 0.4471 & 0.4338 & \textbf{--0.0133} & 0.063 & \textbf{$<$0.001}$^{*}$ \\
+MLP           & TargetEnc    & 0.4121 & 0.3980 & --0.014 & 0.125 & \textbf{0.032}$^{*}$ \\
 \rowcolor{red!10}
-Random Forest & TargetEnc    & 0.4512 & 0.4439 & --0.0074 & 0.063 & \textbf{0.005}$^{*}$ \\
+SVM           & Undersample  & 0.4471 & 0.4338 & --0.013 & 0.062 & \textbf{$<$0.001}$^{*}$ \\
 \rowcolor{red!10}
-SVM           & TargetEnc    & 0.4471 & 0.4410 & --0.0061 & 0.063 & \textbf{0.001}$^{*}$ \\
+K-NN          & TargetEnc    & 0.3951 & 0.3854 & --0.010 & 0.062 & \textbf{0.002}$^{*}$ \\
 \rowcolor{red!10}
-XGBoost       & TargetEnc    & 0.4240 & 0.4210 & --0.0030 & 0.063 & \textbf{0.045}$^{*}$ \\
+Random Forest & TargetEnc    & 0.4512 & 0.4439 & --0.007 & 0.062 & \textbf{0.005}$^{*}$ \\
+\rowcolor{red!10}
+SVM           & TargetEnc    & 0.4471 & 0.4410 & --0.006 & 0.062 & \textbf{0.001}$^{*}$ \\
+\rowcolor{red!10}
+XGBoost       & TargetEnc    & 0.4240 & 0.4210 & --0.003 & 0.062 & \textbf{0.045}$^{*}$ \\
 \bottomrule
 \end{tabular}
 
-\vspace{0.3em}
-\scriptsize $^{*}$ = p<0.05 em paired t-test. Wilcoxon com 5 folds é \emph{conservador} (p mínimo possível = 0.0625).
+\vspace{0.2em}
+\scriptsize $^{*}$ = p$<$0.05 em paired t-test. \textbf{Verde:} promovida. \textbf{Vermelho:} atrapalha.
+\end{frame}
+
+\begin{frame}{Comparação baseline vs variantes — empate técnico (p$\geq$0.05)}
+\textbf{Diferenças abaixo do limiar de significância estatística} — reportadas para completude.
 
 \vspace{0.3em}
-\footnotesize \textbf{Verde:} variante promovida. \textbf{Vermelho:} variante atrapalha. Outros: empate técnico.
+\centering
+\small
+\begin{tabular}{llrrrr}
+\toprule
+\textbf{Modelo} & \textbf{Variante} & $F1_{\text{base}}$ & $F1_{\text{var}}$ & $\Delta$ & paired-t p \\
+\midrule
+Decision Tree & Undersample  & 0.4012 & 0.4111 & +0.010 & 0.151 \\
+XGBoost       & SMOTE        & 0.4240 & 0.4259 & +0.002 & 0.330 \\
+LightGBM      & RobustScaler & 0.4204 & 0.4208 & +0.000 & 0.374 \\
+Decision Tree & RobustScaler & 0.4012 & 0.4012 & +0.000 & 0.933 \\
+SVM           & RobustScaler & 0.4471 & 0.4472 & +0.000 & 0.130 \\
+Random Forest & RobustScaler & 0.4512 & 0.4513 & +0.000 & 0.916 \\
+XGBoost       & RobustScaler & 0.4240 & 0.4240 & +0.000 & --- \\
+LightGBM      & TargetEnc    & 0.4204 & 0.4184 & --0.002 & 0.050 \\
+MLP           & RobustScaler & 0.4121 & 0.4100 & --0.002 & 0.827 \\
+Stacking      & TargetEnc    & 0.4167 & 0.4145 & --0.002 & 0.062 \\
+Stacking      & RobustScaler & 0.4167 & 0.4164 & --0.000 & 0.474 \\
+\bottomrule
+\end{tabular}
+
+\vspace{0.4em}
+\footnotesize \textbf{Nota:} LightGBM TargetEnc (p=0.050) está exatamente no limiar — tratar como empate técnico.
 \end{frame}
 
 \begin{frame}{Contexto: F1 nesse dataset}
@@ -267,7 +290,10 @@ XGBoost       & TargetEnc    & 0.4240 & 0.4210 & --0.0030 & 0.063 & \textbf{0.04
 \end{itemize}
 
 \vspace{0.6em}
-\textbf{Robust e TargetEnc na maioria dos modelos:} efeito praticamente nulo. Árvores são insensíveis a escala (esperado); TargetEncoder em colunas como \texttt{payer\_code} não compensa a perda de granularidade vs OHE esparso quando há features OHE de baixa cardinalidade abundantes.
+\textbf{RobustScaler:} efeito nulo em todos os modelos testados (p$\geq$0.05). Esperado: árvores e modelos baseados em ranking são invariantes a escala; SVM e MLP já normalizados pelo baseline (StandardScaler).
+
+\vspace{0.4em}
+\textbf{TargetEncoder é heterogêneo:} melhora DT e LVQ marginalmente (modelos sem representação sensível a valores), mas \alert{degrada K-NN (--0.010, p=0.002) e MLP (--0.014, p=0.032)} — modelos sensíveis à escala e representação das features. TargetEncoding em colunas de alta cardinalidade (\texttt{diag\_*}, \texttt{payer\_code}) introduz leakage controlado dentro do fold mas reduz granularidade vs OHE para modelos de distância/ativação.
 \end{frame}
 
 \begin{frame}{Modelo vencedor}
