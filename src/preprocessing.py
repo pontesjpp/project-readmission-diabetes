@@ -18,7 +18,14 @@ from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.preprocessing import (
+    OneHotEncoder,
+    RobustScaler,
+    StandardScaler,
+    TargetEncoder,
+)
+
+from .utils import RANDOM_STATE
 
 COLS_DROP = ["weight", "examide", "citoglipton", "encounter_id", "patient_nbr"]
 
@@ -105,14 +112,29 @@ class RawCleaner(BaseEstimator, TransformerMixin):
         return df
 
 
-def _make_column_transformer() -> ColumnTransformer:
+HIGH_CARD_CATEGORICAL_COLS: list[str] = [
+    "payer_code",
+    "medical_specialty",
+    "admission_type_id",
+    "discharge_disposition_id",
+    "admission_source_id",
+]
+
+LOW_CARD_CATEGORICAL_COLS: list[str] = [
+    c for c in OTHER_CATEGORICAL_COLS if c not in HIGH_CARD_CATEGORICAL_COLS
+]
+
+
+def _make_column_transformer(scaler: str = "standard") -> ColumnTransformer:
     """Numérico → impute+scale; Categórico → impute+OHE.
 
+    `scaler` ∈ {"standard", "robust"} controla o escalonamento numérico.
     Usa `handle_unknown='ignore'` no OHE para tolerar categorias novas no teste.
     """
+    scaler_obj = RobustScaler() if scaler == "robust" else StandardScaler()
     numeric_pipe = Pipeline(steps=[
         ("impute", SimpleImputer(strategy="median")),
-        ("scale", StandardScaler()),
+        ("scale", scaler_obj),
     ])
     categorical_pipe = Pipeline(steps=[
         ("impute", SimpleImputer(strategy="most_frequent")),
@@ -123,6 +145,36 @@ def _make_column_transformer() -> ColumnTransformer:
         transformers=[
             ("num", numeric_pipe, NUMERIC_COLS),
             ("cat", categorical_pipe, categorical_cols),
+        ],
+        remainder="drop",
+        verbose_feature_names_out=False,
+    )
+
+
+def _make_target_encoding_transformer() -> ColumnTransformer:
+    """Categóricas de alta cardinalidade via TargetEncoder; resto via OHE.
+
+    TargetEncoder do sklearn faz CV interno por categoria (anti-leakage). Ainda
+    assim, o ColumnTransformer continua sendo ajustado dentro do CV externo do
+    GridSearchCV, então não há vazamento entre folds.
+    """
+    numeric_pipe = Pipeline(steps=[
+        ("impute", SimpleImputer(strategy="median")),
+        ("scale", StandardScaler()),
+    ])
+    ohe_pipe = Pipeline(steps=[
+        ("impute", SimpleImputer(strategy="most_frequent")),
+        ("ohe", OneHotEncoder(handle_unknown="ignore", sparse_output=False)),
+    ])
+    te_pipe = Pipeline(steps=[
+        ("impute", SimpleImputer(strategy="most_frequent")),
+        ("te", TargetEncoder(target_type="multiclass", random_state=RANDOM_STATE)),
+    ])
+    return ColumnTransformer(
+        transformers=[
+            ("num", numeric_pipe, NUMERIC_COLS),
+            ("te_cat", te_pipe, HIGH_CARD_CATEGORICAL_COLS),
+            ("ohe_cat", ohe_pipe, MEDICATION_COLS + LOW_CARD_CATEGORICAL_COLS),
         ],
         remainder="drop",
         verbose_feature_names_out=False,
@@ -142,5 +194,38 @@ def build_baseline_pipeline() -> Pipeline:
     """
     return Pipeline(steps=[
         ("clean", RawCleaner()),
-        ("ct", _make_column_transformer()),
+        ("ct", _make_column_transformer(scaler="standard")),
+    ])
+
+
+def build_robust_pipeline() -> Pipeline:
+    """Variante: troca StandardScaler por RobustScaler (resistente a outliers)."""
+    return Pipeline(steps=[
+        ("clean", RawCleaner()),
+        ("ct", _make_column_transformer(scaler="robust")),
+    ])
+
+
+def build_target_encoding_pipeline() -> Pipeline:
+    """Variante: TargetEncoder nas categóricas de alta cardinalidade."""
+    return Pipeline(steps=[
+        ("clean", RawCleaner()),
+        ("ct", _make_target_encoding_transformer()),
+    ])
+
+
+def build_smote_pipeline():
+    """Variante: pré-processamento baseline + SMOTE.
+
+    Retorna um `imblearn.pipeline.Pipeline` para que o SMOTE seja aplicado
+    DENTRO de cada fold de CV (sem leakage). `src.models._wrap` detecta o
+    tipo e mantém a estrutura ao anexar o classificador.
+    """
+    from imblearn.over_sampling import SMOTE
+    from imblearn.pipeline import Pipeline as ImbPipeline
+
+    return ImbPipeline(steps=[
+        ("clean", RawCleaner()),
+        ("ct", _make_column_transformer(scaler="standard")),
+        ("smote", SMOTE(random_state=RANDOM_STATE, k_neighbors=5)),
     ])

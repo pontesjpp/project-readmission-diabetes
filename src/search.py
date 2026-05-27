@@ -13,14 +13,21 @@ e são consumidos por `evaluation.paired_compare` para Wilcoxon/paired t-test.
 
 from __future__ import annotations
 
-from typing import Any, Callable
+import ast
+import re
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, Callable
 
 import matplotlib.pyplot as plt
 import pandas as pd
 from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
 
-from .models import ModelSpec
 from .utils import CV_RESULTS, FIGURES, RANDOM_STATE, ensure_dirs, get_cv
+
+if TYPE_CHECKING:
+    from .models import ModelSpec
+else:
+    from .models import ModelSpec  # noqa: F401  (runtime import for ModelSpec hints)
 
 PrepFactory = Callable[[], Any]
 
@@ -111,3 +118,92 @@ def best_per_fold_scores(search) -> list[float]:
         1 for k in cv_results if k.startswith("split") and k.endswith("_test_score")
     )
     return [cv_results[f"split{i}_test_score"][best_idx] for i in range(n_folds)]
+
+
+@dataclass
+class CachedSearch:
+    """Reconstrução de um search a partir do CSV persistido em `cv_results`.
+
+    Tem o mínimo para a etapa de comparação (cv_results_, best_index_, best_score_,
+    best_params_). NÃO traz `best_estimator_` — para reusar o modelo treinado,
+    chamar `refit_best(...)`.
+    """
+
+    cv_results_: dict[str, Any]
+    best_index_: int
+    best_score_: float
+    best_params_: dict[str, Any]
+
+
+_NUMPY_WRAP_RE = re.compile(r"np\.(?:float\d*|int\d*|bool_)\(([^()]+)\)")
+
+
+def _parse_params_cell(s: str) -> dict:
+    """Robusto a `np.float64(10.0)` que `ast.literal_eval` não engole.
+
+    Substitui chamadas `np.<type>(<lit>)` por `<lit>` antes do literal_eval.
+    Mantém comportamento padrão pra dicts puros.
+    """
+    if not isinstance(s, str):
+        return s
+    cleaned = _NUMPY_WRAP_RE.sub(r"\1", s)
+    try:
+        return ast.literal_eval(cleaned)
+    except (ValueError, SyntaxError):
+        # último recurso: eval com namespace mínimo (CSVs gerados por nós, controlados)
+        import numpy as _np
+
+        return eval(s, {"__builtins__": {}}, {"np": _np})
+
+
+def load_search_from_csv(spec: "ModelSpec", tag: str) -> CachedSearch | None:
+    """Lê `cv_results__<modelo>__<tag>.csv` e devolve um CachedSearch ou None."""
+    csv = CV_RESULTS / f"{spec.name}__{tag}.csv"
+    if not csv.exists():
+        return None
+    df = pd.read_csv(csv)
+    if df.empty or "mean_test_score" not in df.columns:
+        return None
+    cv_results = {col: df[col].to_numpy() for col in df.columns}
+    if "params" in df.columns:
+        cv_results["params"] = [_parse_params_cell(p) for p in df["params"].tolist()]
+    best_idx = int(df["mean_test_score"].idxmax())
+    return CachedSearch(
+        cv_results_=cv_results,
+        best_index_=best_idx,
+        best_score_=float(df["mean_test_score"].iloc[best_idx]),
+        best_params_=cv_results["params"][best_idx] if "params" in cv_results else {},
+    )
+
+
+def get_or_run_search(
+    spec: "ModelSpec",
+    X,
+    y,
+    prep_factory: PrepFactory,
+    tag: str = "baseline",
+    force: bool = False,
+):
+    """Carrega o search do CSV se já existir; senão executa `run_search`.
+
+    Permite reprodutibilidade do `main.ipynb` sem refazer horas de busca:
+    a primeira execução popula `reports/cv_results/`, e execuções subsequentes
+    reutilizam o cache. Use `force=True` para sobrescrever.
+    """
+    if not force:
+        cached = load_search_from_csv(spec, tag)
+        if cached is not None:
+            return cached
+    return run_search(spec, X, y, prep_factory, tag=tag)
+
+
+def refit_best(spec: "ModelSpec", X, y, prep_factory: PrepFactory, best_params: dict):
+    """Refit do modelo vencedor com os hiperparâmetros escolhidos.
+
+    Usado na seção 9 (avaliação final) sem precisar manter o `best_estimator_`
+    do GridSearchCV em memória. Devolve um Pipeline ajustado em (X, y).
+    """
+    pipe = spec.make_pipeline(prep_factory)
+    pipe.set_params(**best_params)
+    pipe.fit(X, y)
+    return pipe

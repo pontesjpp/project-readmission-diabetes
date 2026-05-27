@@ -21,3 +21,7 @@ data/processed/*.parquet
 # IDE
 .vscode/
 .idea/
+.claude/
+
+# Runtime logs (regenerados pelos scripts/run_*.py)
+logs/

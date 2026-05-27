@@ -1,0 +1,174 @@
+% IF1014 — Relatório final (entrega 10/06/2026, máx. 25 páginas, sem apêndices).
+% Compilação: pdflatex relatorio.tex (duas passadas para refs/citações)
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[brazil]{babel}
+\usepackage[margin=2.4cm]{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{listings}
+\usepackage{amsmath}
+
+\hypersetup{colorlinks=true, urlcolor=blue, linkcolor=black, citecolor=black}
+
+\title{Previsão de readmissão hospitalar em pacientes diabéticos\\\large IF1014 — Mineração de Dados Aplicada (CRISP-DM)}
+\author{Equipe \textit{[a preencher]} \\ UFPE — 2026.1}
+\date{10 de junho de 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Aplicamos o ciclo CRISP-DM completo ao dataset Diabetes 130-US Hospitals (UCI 296) para classificar a janela de readmissão hospitalar de pacientes diabéticos em \texttt{<30}, \texttt{>30} e \texttt{NO}. O conjunto foi dividido por amostragem estratificada uma única vez ($n_{\text{treino}}=81{,}412$, $n_{\text{teste}}=20{,}354$), e o teste foi mantido isolado por uma guarda de token até a avaliação final. Treinamos os 10 algoritmos obrigatórios sob 5-fold estratificado pareado e busca de hiperparâmetros, otimizando F1-macro. Comparamos pareadamente o pré-processamento baseline contra três variantes (SMOTE, RobustScaler, TargetEncoder). O modelo final \emph{[a preencher]} alcançou F1-macro de \emph{[X.XXX]} no teste, com \emph{[análise sintética por classe]}. Discutimos riscos de viés, monitoramento e gatilhos de retreinamento para deployment.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+\section{Business Understanding}
+\subsection{Briefing do cliente fictício}
+
+O cliente \emph{SI5 Health} atua no setor de \emph{cuidado hospitalar pós-alta} e precisa de um modelo capaz de \emph{prever a janela de readmissão de pacientes diabéticos na hora da alta}, em que a saída pertença a uma das classes \texttt{<30}, \texttt{>30} ou \texttt{NO}. O sucesso será medido por \emph{F1-macro} sobre o conjunto de teste, com restrição de \emph{tempo de inferência $<200$ ms por paciente, fila de acompanhamento limitada à capacidade operacional do time pós-alta, e custo assimétrico de erro (falso negativo na classe} \texttt{<30} \emph{é o mais grave: leva a readmissão sem suporte)}. As implicações éticas relevantes são \emph{viés histórico em variáveis demográficas (race, age, gender), privacidade de dados clínicos (pseudonimização e retenção mínima), e o uso do escore como apoio, não substituto, à decisão clínica}.
+
+\subsection{Critérios de sucesso e restrições operacionais}
+\begin{itemize}
+  \item Métrica principal: F1-macro sobre o teste.
+  \item Métricas secundárias: balanced accuracy, ROC-AUC e PR-AUC macro multiclasse, métricas por classe.
+  \item Métrica operacional crítica: recall(\texttt{<30}).
+  \item Capacidade da fila pós-alta: \emph{[X pacientes/dia]} — calibração de limiar acontece nesse teto.
+\end{itemize}
+
+\section{Data Understanding e EDA}
+\subsection{Dataset}
+Strack et al.\ (2014) consolidaram 101.766 encontros entre 1999 e 2008 em 130 hospitais americanos. Cada linha é uma internação de paciente diabético, com 50 atributos clínicos, demográficos e operacionais. O alvo \texttt{readmitted} é trinário.
+
+\subsection{Distribuição da classe alvo}
+A figura~\ref{fig:eda_class} resume a distribuição no treino após o split. A classe \texttt{<30} representa 11{,}2\% — minoritária, motivando F1-macro como métrica.
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.62\linewidth]{reports/figures/eda_class_balance.png}
+  \caption{Distribuição da classe alvo no conjunto de treino (81.412 pacientes).}
+  \label{fig:eda_class}
+\end{figure}
+
+\subsection{Missingness e tratamento}
+A figura~\ref{fig:eda_miss} elenca colunas com valores ausentes (codificados como \texttt{?} no arquivo bruto). \texttt{weight} (97\%), \texttt{payer\_code} ($\sim$40\%) e \texttt{medical\_specialty} ($\sim$49\%) foram tratadas distintamente: \texttt{weight} foi removida; as demais entraram via imputação \texttt{most\_frequent} no pipeline. As variáveis \texttt{examide} e \texttt{citoglipton} têm um único valor e foram removidas.
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.7\linewidth]{reports/figures/eda_missingness.png}
+  \caption{Fração de valores ausentes por coluna no treino.}
+  \label{fig:eda_miss}
+\end{figure}
+
+\subsection{Distribuições numéricas por classe}
+A figura~\ref{fig:eda_num} mostra que \texttt{number\_inpatient}, \texttt{num\_medications}, \texttt{time\_in\_hospital} e \texttt{number\_diagnoses} diferenciam pacientes \texttt{<30}. As caudas longas em variáveis de contagem motivaram a variante \texttt{RobustScaler}.
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.85\linewidth]{reports/figures/eda_numeric_by_class.png}
+  \caption{Distribuições de variáveis numéricas chave por classe (escala log).}
+  \label{fig:eda_num}
+\end{figure}
+
+\section{Data Preparation}
+\subsection{Integridade do split treino/teste}
+O split é materializado em \texttt{data/interim/} com \texttt{random\_state=42}, \texttt{test\_size=0.2} e estratificação. A função \texttt{load\_test} em \texttt{src/data\_loader.py} levanta \texttt{PermissionError} sem o token literal \texttt{I\_AM\_IN\_FINAL\_EVALUATION}. Esse token aparece apenas na Seção 9 do \texttt{main.ipynb}.
+
+\subsection{Pipeline baseline}
+\begin{itemize}
+  \item \texttt{RawCleaner}: drop estrutural, \texttt{?} $\rightarrow$ NaN, agrupamento ICD-9 (9 categorias clínicas + Other), conversão de IDs operacionais para string.
+  \item Numéricas: \texttt{SimpleImputer(median)} $\rightarrow$ \texttt{StandardScaler}.
+  \item Categóricas: \texttt{SimpleImputer(most\_frequent)} $\rightarrow$ \texttt{OneHotEncoder(handle\_unknown="ignore")}.
+\end{itemize}
+
+\subsection{Variantes}
+\paragraph{SMOTE.} \texttt{imblearn.pipeline.Pipeline} com SMOTE aplicado por fold, sintetizando minoria \texttt{<30} via $k=5$ vizinhos.
+\paragraph{RobustScaler.} Substitui StandardScaler nas numéricas. Motivado pela cauda longa em variáveis de contagem.
+\paragraph{TargetEncoder.} Codifica \texttt{payer\_code}, \texttt{medical\_specialty}, \texttt{admission\_*\_id} via \texttt{TargetEncoder(target\_type="multiclass")} do scikit-learn (CV interno anti-leakage). Mantém OHE no resto.
+
+\section{Modeling}
+\subsection{Os 10 algoritmos}
+\begin{table}[h]\centering
+\begin{tabular}{lll}
+\toprule
+\textbf{Família} & \textbf{Algoritmo} & \textbf{Implementação} \\
+\midrule
+Lazy            & K-NN            & \texttt{KNeighborsClassifier} \\
+Protótipos      & LVQ             & \texttt{sklvq.GLVQ} (subclasse \texttt{PatchedGLVQ}) \\
+Árvore          & Decision Tree   & \texttt{DecisionTreeClassifier} \\
+Margem          & SVM             & \texttt{LinearSVC} \\
+Bagging         & Random Forest   & \texttt{RandomForestClassifier} \\
+RNA             & MLP             & \texttt{MLPClassifier (wrapper string)} \\
+RNA Comitê      & Bagging-MLP     & \texttt{BaggingClassifier(estimator=MLP)} \\
+Stacking        & Stacking heter. & RF+LGBM+DT, meta \texttt{LogisticRegression} \\
+Boosting        & XGBoost (GPU)   & \texttt{XGBClassifier(device=cuda)} \\
+Boosting        & LightGBM        & \texttt{LGBMClassifier} \\
+\bottomrule
+\end{tabular}
+\caption{Os 10 algoritmos obrigatórios e respectivas implementações.}
+\end{table}
+
+\subsection{Espaço de busca e estratégia}
+Modelos com poucos HPs usam GridSearchCV; com espaço maior, RandomizedSearchCV (\texttt{n\_iter} 5--10). Todos compartilham \texttt{StratifiedKFold(5, shuffle=True, random\_state=42)}, garantindo folds pareados para Wilcoxon. Detalhe completo dos grids em \texttt{src/models.py}.
+
+\section{Evaluation}
+\subsection{Resultados do baseline}
+\textit{Inserir tabela \texttt{df\_summary} da Seção 5 do notebook (F1-macro e desvio por modelo no baseline).}
+
+\subsection{Curvas treino vs validação}
+\textit{Mostrar exemplos representativos de \texttt{reports/figures/<modelo>\_\_baseline\_\_train\_vs\_val.png} para 2--3 modelos. Discutir gap treino/val (overfit, underfit, sweet spot).}
+
+\subsection{Comparação pareada baseline vs variantes}
+\textit{Inserir tabela \texttt{df\_pair} da Seção 7. Resumir quais (modelo $\times$ variante) tiveram p<0.05 e diferença positiva. Para cada par significativo, reportar a diferença média e o p-valor de Wilcoxon e paired t-test.}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.95\linewidth]{reports/figures/baseline_vs_variants_f1.png}
+  \caption{F1-macro (média dos 5 folds) por modelo e pré-processamento.}
+  \label{fig:f1_bars}
+\end{figure}
+
+\subsection{Seleção do modelo final}
+\textit{Justificar a escolha. Discutir custo computacional e interpretabilidade.}
+
+\section{Avaliação no conjunto de teste}
+\textit{Inserir matriz de confusão (figura \texttt{reports/figures/final\_confusion.png}), ROC macro (\texttt{final\_\_roc.png}), PR macro (\texttt{final\_\_pr.png}) e tabela do classification report. Discutir o gap entre F1-macro de CV e F1-macro de teste.}
+
+\section{Deployment, riscos e monitoramento}
+\subsection{Cenário de uso}
+Escore acionado na alta; pacientes \texttt{<30} entram em fila de acompanhamento (ligação 48h, retorno 7d, revisão farmacoterapia).
+
+\subsection{Riscos}
+Viés demográfico, falso negativo da classe \texttt{<30}, drift de população, privacidade. Mitigações em texto.
+
+\subsection{Monitoramento}
+F1-macro mensal estratificado, PSI semanal nas top-15 features, métricas de aceitação clínica do alerta.
+
+\subsection{Retreinamento}
+Gatilhos: PSI>0.25 em $\geq$3 features, F1 mensal cai >0.05 vs teste, ou rotina trimestral.
+
+\section{Reprodutibilidade e ferramentas}
+\subsection{Ferramentas}
+\begin{itemize}
+  \item Python 3.12, gerenciado por \texttt{uv} (\texttt{uv.lock} versionado).
+  \item Pipelines em \texttt{scikit-learn} 1.8 (com \texttt{imbalanced-learn} 0.14 para SMOTE).
+  \item XGBoost 3.2 (GPU/CUDA quando disponível), LightGBM 4.6, sklvq 0.1.2 (com shim \texttt{PatchedGLVQ}).
+\end{itemize}
+
+\subsection{Reprodução}
+\begin{verbatim}
+uv sync
+uv run jupyter nbconvert --to notebook --execute main.ipynb \
+                          --output main.executed.ipynb
+\end{verbatim}
+A primeira execução popula \texttt{reports/cv\_results/} (CSVs por modelo $\times$ variante) e \texttt{reports/figures/} (curvas, matriz, ROC/PR). Execuções subsequentes reusam o cache (\texttt{get\_or\_run\_search}).
+
+\subsection{Uso de IA generativa}
+Em conformidade com a Seção 14 das exigências, declaramos o uso do assistente de programação Claude (Anthropic, Opus 4.7) durante o desenvolvimento, para apoio em codificação, revisão e documentação. Decisões metodológicas (split estratificado, escolha de métrica, escolha de algoritmos e variantes, leitura crítica dos resultados, e revisão final deste relatório) foram conduzidas pela equipe.
+
+\end{document}

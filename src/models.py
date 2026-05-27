@@ -14,19 +14,69 @@ para que a fase final só precise alterar a flag.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Callable
 
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neighbors import KNeighborsClassifier
+from sklearn.neural_network import MLPClassifier
 from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import LabelEncoder
 from sklearn.tree import DecisionTreeClassifier
 
 from .utils import RANDOM_STATE, get_device
 
+
+# Compat sklvq 0.1.2 × sklearn 1.8: aplicado no IMPORT do módulo. Joblib workers
+# que precisem unpicklar `PatchedGLVQ` reimportam src.models, então o side-effect
+# do patch vai junto — diferente do monkey-patch tardio que era process-local.
+def _apply_sklvq_sklearn_compat() -> None:
+    try:
+        import sklvq.models._base as _lvq_base
+    except Exception:
+        return
+    from sklearn.utils import check_array as _check_array
+    from sklearn.utils.validation import validate_data as _validate_data
+
+    def _validate_data_compat(self, *args, **kwargs):
+        if "force_all_finite" in kwargs:
+            kwargs["ensure_all_finite"] = kwargs.pop("force_all_finite")
+        return _validate_data(self, *args, **kwargs)
+
+    def _check_array_compat(*args, **kwargs):
+        if "force_all_finite" in kwargs:
+            kwargs["ensure_all_finite"] = kwargs.pop("force_all_finite")
+        return _check_array(*args, **kwargs)
+
+    if not getattr(_lvq_base.LVQBaseClass, "_sklvq_compat_applied", False):
+        _lvq_base.LVQBaseClass._validate_data = _validate_data_compat
+        _lvq_base.check_array = _check_array_compat
+        _lvq_base.LVQBaseClass._sklvq_compat_applied = True
+
+
+_apply_sklvq_sklearn_compat()
+
 PrepFactory = Callable[[], Any]
 ModelFactory = Callable[[PrepFactory], Pipeline]
+
+
+class MLPStringLabel(MLPClassifier):
+    """MLP que aceita rótulos string sem disparar o bug de early_stopping.
+
+    `MLPClassifier(early_stopping=True)` chama `np.isnan(y_pred)` sobre o
+    conjunto de validação interno; com rótulos string (`<30`/`>30`/`NO`) o
+    ufunc estoura `TypeError`. Encodamos no fit e desfazemos no predict.
+    Precisa ser top-level (não local) para sobreviver ao pickle do joblib
+    quando o estimator é clonado para workers (`n_jobs>1`).
+    """
+
+    def fit(self, X, y, **kw):
+        self._le = LabelEncoder()
+        return super().fit(X, self._le.fit_transform(y), **kw)
+
+    def predict(self, X):
+        return self._le.inverse_transform(super().predict(X))
 
 
 @dataclass(frozen=True)
@@ -41,8 +91,21 @@ class ModelSpec:
 
 
 def _wrap(prep_factory: PrepFactory, estimator) -> Pipeline:
-    """Pipeline = preprocessador (recriado por chamada) → estimator."""
-    return Pipeline(steps=[("prep", prep_factory()), ("clf", estimator)])
+    """Pipeline = preprocessador (recriado por chamada) → estimator.
+
+    Se a fábrica devolver um `imblearn.pipeline.Pipeline` (variante SMOTE/etc.),
+    achatamos os steps no nível do pipeline e mantemos o tipo do imblearn —
+    necessário para que o resampler seja aplicado por fold sem leakage.
+    """
+    prep = prep_factory()
+    try:
+        from imblearn.pipeline import Pipeline as ImbPipeline
+
+        if isinstance(prep, ImbPipeline):
+            return ImbPipeline(steps=list(prep.steps) + [("clf", estimator)])
+    except ImportError:
+        pass
+    return Pipeline(steps=[("prep", prep), ("clf", estimator)])
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -134,11 +197,9 @@ SVM_GRID: dict[str, list[Any]] = {
 
 
 def _make_mlp(prep_factory: PrepFactory) -> Pipeline:
-    from sklearn.neural_network import MLPClassifier
-
     return _wrap(
         prep_factory,
-        MLPClassifier(
+        MLPStringLabel(
             random_state=RANDOM_STATE,
             early_stopping=True,
             max_iter=200,
@@ -193,50 +254,31 @@ XGB_GRID: dict[str, list[Any]] = {
 
 
 # ──────────────────────────────────────────────────────────────────────────
-# LVQ (sklvq) — EM STANDBY
+# LVQ (sklvq) — via PatchedGLVQ
 # ──────────────────────────────────────────────────────────────────────────
-# sklvq 0.1.2 usa internals do sklearn removidos em 1.6+ (`_validate_data`) e
-# o argumento `force_all_finite` renomeado para `ensure_all_finite`. O shim
-# abaixo funciona em single-process mas é process-local: joblib (n_jobs>1)
-# spawna workers que reimportam sklvq sem o patch, fazendo a busca falhar.
-# Solução pendente: trocar por um subclass `PatchedGLVQ(GLVQ)` definido aqui
-# em `src.models` para que a correção viaje junto no unpickle. Não removido
-# do registry como "stub" para evitar perder a contagem de 10 algoritmos
-# antes da entrega final (10/06) — a entrada está comentada em MODEL_REGISTRY.
+# Compat patch é aplicado no topo do módulo (sobrevive ao import dos workers
+# do joblib). PatchedGLVQ vive aqui em src.models — ao unpicklar, joblib
+# precisa importar src.models, disparando o patch automaticamente.
 
-_LVQ_PATCH_APPLIED = False
+try:
+    from sklvq import GLVQ as _GLVQ
 
+    class PatchedGLVQ(_GLVQ):
+        """GLVQ com compat shim de sklearn 1.8 aplicado no import de src.models."""
 
-def _apply_sklvq_sklearn_compat() -> None:
-    global _LVQ_PATCH_APPLIED
-    if _LVQ_PATCH_APPLIED:
-        return
-    import sklvq.models._base as _lvq_base
-    from sklearn.utils import check_array as _check_array
-    from sklearn.utils.validation import validate_data as _validate_data
+        pass
 
-    def _validate_data_compat(self, *args, **kwargs):
-        if "force_all_finite" in kwargs:
-            kwargs["ensure_all_finite"] = kwargs.pop("force_all_finite")
-        return _validate_data(self, *args, **kwargs)
-
-    def _check_array_compat(*args, **kwargs):
-        if "force_all_finite" in kwargs:
-            kwargs["ensure_all_finite"] = kwargs.pop("force_all_finite")
-        return _check_array(*args, **kwargs)
-
-    _lvq_base.LVQBaseClass._validate_data = _validate_data_compat
-    _lvq_base.check_array = _check_array_compat
-    _LVQ_PATCH_APPLIED = True
+    _LVQ_AVAILABLE = True
+except Exception:
+    _LVQ_AVAILABLE = False
 
 
 def _make_lvq(prep_factory: PrepFactory) -> Pipeline:
-    _apply_sklvq_sklearn_compat()
-    from sklvq import GLVQ
-
+    if not _LVQ_AVAILABLE:
+        raise RuntimeError("sklvq não disponível ou patch falhou.")
     return _wrap(
         prep_factory,
-        GLVQ(
+        PatchedGLVQ(
             random_state=RANDOM_STATE,
             prototype_init="class-conditional-mean",
             prototype_n_per_class=1,
@@ -244,10 +286,10 @@ def _make_lvq(prep_factory: PrepFactory) -> Pipeline:
     )
 
 
+# Grid enxuto: LVQ é muito caro em ~80k × ~100+ features OHE.
 LVQ_GRID: dict[str, list[Any]] = {
-    "clf__prototype_n_per_class": [1, 2, 3],
-    "clf__activation_type": ["sigmoid", "identity"],
-    "clf__distance_type": ["squared-euclidean"],
+    "clf__prototype_n_per_class": [1, 2],
+    "clf__activation_type": ["sigmoid"],
 }
 
 
@@ -258,9 +300,8 @@ LVQ_GRID: dict[str, list[Any]] = {
 
 def _make_mlp_committee(prep_factory: PrepFactory) -> Pipeline:
     from sklearn.ensemble import BaggingClassifier
-    from sklearn.neural_network import MLPClassifier
 
-    base_mlp = MLPClassifier(
+    base_mlp = MLPStringLabel(
         random_state=RANDOM_STATE,
         early_stopping=True,
         max_iter=200,
@@ -278,11 +319,10 @@ def _make_mlp_committee(prep_factory: PrepFactory) -> Pipeline:
 
 
 MLP_COMMITTEE_GRID: dict[str, list[Any]] = {
-    "clf__n_estimators": [5, 10, 15],
-    "clf__max_samples": [0.6, 0.8, 1.0],
-    "clf__max_features": [0.7, 1.0],
-    "clf__estimator__hidden_layer_sizes": [(64,), (128,), (64, 64)],
-    "clf__estimator__alpha": list(np.logspace(-5, -2, 4)),
+    "clf__n_estimators": [5, 10],
+    "clf__max_samples": [1.0],
+    "clf__estimator__hidden_layer_sizes": [(64,)],
+    "clf__estimator__alpha": [1e-4, 1e-2],
 }
 
 
@@ -297,11 +337,15 @@ def _make_stacking(prep_factory: PrepFactory) -> Pipeline:
     from sklearn.linear_model import LogisticRegression
     from sklearn.tree import DecisionTreeClassifier
 
+    # Estimadores base intencionalmente leves: o stacking original com
+    # RF/LGBM=200 árvores + cv interno=3 levava ~4h/grid. Reduzir é
+    # documentado: ainda assim heterogêneo (árvore profunda + boosting +
+    # bagging) e suficiente para a comparação metodológica da rubrica.
     estimators = [
         (
             "rf",
             RandomForestClassifier(
-                n_estimators=200,
+                n_estimators=80,
                 max_depth=12,
                 n_jobs=2,
                 random_state=RANDOM_STATE,
@@ -310,7 +354,7 @@ def _make_stacking(prep_factory: PrepFactory) -> Pipeline:
         (
             "lgbm",
             LGBMClassifier(
-                n_estimators=200,
+                n_estimators=100,
                 n_jobs=2,
                 random_state=RANDOM_STATE,
                 objective="multiclass",
@@ -339,10 +383,9 @@ def _make_stacking(prep_factory: PrepFactory) -> Pipeline:
     )
 
 
+# Grid enxuto: 3 candidatos (variação só no meta-classificador).
 STACKING_GRID: dict[str, list[Any]] = {
     "clf__final_estimator__C": [0.1, 1.0, 10.0],
-    "clf__passthrough": [False, True],
-    "clf__stack_method": ["predict_proba", "auto"],
 }
 
 
@@ -405,15 +448,13 @@ MODEL_REGISTRY: dict[str, ModelSpec] = {
         enabled_for_checkpoint=True,
         notes="XGBoost com tree_method=hist.",
     ),
-    # "lvq": EM STANDBY — sklvq 0.1.2 incompatível com sklearn 1.8 em n_jobs>1.
-    # Pendente: implementar `PatchedGLVQ(GLVQ)` em src.models e reativar aqui.
-    # "lvq": ModelSpec(
-    #     name="lvq",
-    #     make_pipeline=_make_lvq,
-    #     param_grid=LVQ_GRID,
-    #     search="grid",
-    #     notes="GLVQ (sklvq) — protótipos por classe; sensível à dimensionalidade do OHE.",
-    # ),
+    "lvq": ModelSpec(
+        name="lvq",
+        make_pipeline=_make_lvq,
+        param_grid=LVQ_GRID,
+        search="grid",
+        notes="GLVQ (sklvq) — protótipos por classe; grid enxuto pelo custo em alta dim.",
+    ),
     "mlp_committee": ModelSpec(
         name="mlp_committee",
         make_pipeline=_make_mlp_committee,
