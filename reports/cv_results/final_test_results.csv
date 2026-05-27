@@ -1,0 +1,2 @@
+model,variant,best_params,f1_macro_cv,f1_macro_cv_std,f1_macro_test,delta_test_minus_cv,balanced_accuracy_test,roc_auc_macro_test,pr_auc_macro_test
+random_forest,robust,"{'clf__n_estimators': 200, 'clf__min_samples_leaf': 1, 'clf__max_features': 'log2', 'clf__max_depth': 20, 'clf__class_weight': 'balanced'}",0.4512750851155827,0.0028200583285675,0.45532986485049154,0.004054779734908864,0.4529949729517793,0.6737312958497578,0.473933554007494

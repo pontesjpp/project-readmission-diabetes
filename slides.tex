@@ -1,10 +1,9 @@
-% IF1014 — Apresentação (15 min cronometrados). Sem código nos slides.
-% Compilação: pdflatex slides.tex (duas passadas para refs)
 \documentclass[aspectratio=169]{beamer}
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
 \usepackage[brazil]{babel}
 \usepackage{graphicx}
+\graphicspath{{./}}
 \usepackage{booktabs}
 \usepackage{array}
 \usepackage[table]{xcolor}
@@ -15,7 +14,7 @@
 
 \title[Diabetes 130-US]{Previsão de readmissão hospitalar\\\small{Diabetes 130-US Hospitals (UCI 296)}}
 \subtitle{IF1014 — Mineração de Dados Aplicada (CRISP-DM)}
-\author{Equipe \textit{[a preencher]}}
+\author{Equipe \textit{João Pontes \and Marcos Antonio \and Theo Barza}}
 \institute{UFPE — 2026.1}
 \date{27 de maio de 2026}
 
@@ -268,7 +267,7 @@ Stacking      & RobustScaler & 0.4167 & 0.4164 & --0.000 & 0.474 \\
 \textbf{Nossa contribuição não é F1 alto:} é uma comparação \emph{metodologicamente rigorosa} entre 10 algoritmos $\times$ 4 pré-processamentos, com Wilcoxon pareado para todas as decisões.
 \end{frame}
 
-\begin{frame}{Achado metodológico: SMOTE não é gratuito}
+\begin{frame}[shrink=10]{Achado metodológico: SMOTE não é gratuito}
 \textbf{Padrão claro e simétrico entre SMOTE e Undersampling:}
 
 \vspace{0.6em}
@@ -296,49 +295,60 @@ Stacking      & RobustScaler & 0.4167 & 0.4164 & --0.000 & 0.474 \\
 \textbf{TargetEncoder é heterogêneo:} melhora DT e LVQ marginalmente (modelos sem representação sensível a valores), mas \alert{degrada K-NN (--0.010, p=0.002) e MLP (--0.014, p=0.032)} — modelos sensíveis à escala e representação das features. TargetEncoding em colunas de alta cardinalidade (\texttt{diag\_*}, \texttt{payer\_code}) introduz leakage controlado dentro do fold mas reduz granularidade vs OHE para modelos de distância/ativação.
 \end{frame}
 
-\begin{frame}{Modelo vencedor}
+\begin{frame}[shrink=8]{Modelo vencedor}
 \textbf{Vencedor:} \alert{Random Forest} (com pré-processamento baseline ou RobustScaler — \emph{empate técnico}).
 
-\vspace{0.4em}
+\vspace{0.3em}
 \textbf{F1-macro CV:} \textbf{0.4513 $\pm$ 0.0028} (5 folds estratificados).
 
-\vspace{0.6em}
+\vspace{0.3em}
 \textbf{Hiperparâmetros (encontrados na busca):}
-\begin{itemize}
+\begin{itemize}\setlength{\itemsep}{0pt}
   \item \texttt{n\_estimators=200}, \texttt{max\_depth=20}, \texttt{max\_features="log2"}
   \item \texttt{min\_samples\_leaf=1}, \alert{\texttt{class\_weight="balanced"}}
 \end{itemize}
 
-\vspace{0.4em}
+\vspace{0.3em}
 \textbf{Por quê esse vence:}
-\begin{itemize}
-  \item \textbf{Top do ranking} dentre as 29+ combinações avaliadas. SVM 2º (0.4471) — empate técnico no nível ($\Delta$=0.004, Wilcoxon p=0.31).
+\begin{itemize}\setlength{\itemsep}{1pt}
+  \item \textbf{Top do ranking} dentre as 29+ combinações avaliadas. SVM 2º (0.4471) — empate técnico ($\Delta$=0.004, Wilcoxon p=0.31).
   \item \texttt{class\_weight="balanced"} ataca o desbalanceamento \emph{na árvore}, sem custo de SMOTE.
   \item Curva treino vs val: overfit moderado ($F1_{\text{tr}}$=0.84, $F1_{\text{val}}$=0.45) mas \emph{estável} entre folds ($\sigma$=0.003).
   \item Inferência rápida ($\sim$ms/amostra), interpretabilidade via importância de features, pronto pra deployment.
-  \item Variantes testadas em RF: \textbf{SMOTE atrapalha} (--0.021, p$<$0.001), \emph{Robust empata}, TargetEnc atrapalha (--0.007).
+  \item Variantes em RF: \textbf{SMOTE atrapalha} (--0.021, p$<$0.001), \emph{Robust empata}, TargetEnc atrapalha (--0.007).
 \end{itemize}
 \end{frame}
 
 \begin{frame}{Avaliação final no teste}
-\textit{(Preencher após executar a Seção 9.)}
-
 \begin{columns}
 \begin{column}{0.45\textwidth}
 \includegraphics[width=\linewidth]{reports/figures/final_confusion.png}
 \end{column}
 \begin{column}{0.55\textwidth}
 \small
-\textbf{F1-macro teste:} \emph{X.XXXX}\\
-\textbf{F1-macro CV:} \emph{X.XXXX ± X.XXXX}\\
-\textbf{$\Delta$ teste $-$ CV:} \emph{$\pm$X.XXXX}\\
-\textbf{Balanced accuracy:} \emph{X.XXXX}\\
-\textbf{ROC-AUC macro:} \emph{X.XXXX}\\
-\textbf{PR-AUC macro:} \emph{X.XXXX}
+\textbf{F1-macro teste:} \textbf{0.4553}\\
+\textbf{F1-macro CV:} 0.4513 $\pm$ 0.0028\\
+\textbf{$\Delta$ teste $-$ CV:} $+$0.0041\\
+\textbf{Balanced accuracy:} 0.4530\\
+\textbf{ROC-AUC macro:} 0.6737\\
+\textbf{PR-AUC macro:} 0.4739
 
 \vspace{0.5em}
-\textbf{recall(\texttt{<30}):} \emph{X.XXX}\\
-\emph{(métrica operacional crítica)}
+\textbf{recall(\texttt{<30}):} 0.196\\
+\emph{(métrica operacional crítica — 80\% dos}\\
+\emph{pacientes de alto risco não sinalizados)}
+
+\vspace{0.3em}
+\footnotesize
+\begin{tabular}{lrrr}
+\toprule
+\textbf{Classe} & \textbf{Prec.} & \textbf{Rec.} & \textbf{F1} \\
+\midrule
+\texttt{<30} & 0.241 & 0.196 & 0.216 \\
+\texttt{>30} & 0.477 & 0.479 & 0.478 \\
+\texttt{NO}  & 0.661 & 0.684 & 0.672 \\
+\bottomrule
+\end{tabular}
 \end{column}
 \end{columns}
 \end{frame}
@@ -391,10 +401,7 @@ Stacking      & RobustScaler & 0.4167 & 0.4164 & --0.000 & 0.474 \\
 
 \vspace{1em}
 \small
-Repositório: \emph{[link privado, professor adicionado]}
-
-\vspace{0.5em}
-Equipe: \emph{[nomes]}
+Repositório: \emph{https://github.com/pontesjpp/project-readmission-diabetes.git}
 \end{frame}
 
 \end{document}
