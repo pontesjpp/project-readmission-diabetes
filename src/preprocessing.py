@@ -229,3 +229,24 @@ def build_smote_pipeline():
         ("ct", _make_column_transformer(scaler="standard")),
         ("smote", SMOTE(random_state=RANDOM_STATE, k_neighbors=5)),
     ])
+
+
+def build_undersampling_pipeline():
+    """Variante: pré-processamento baseline + RandomUnderSampler.
+
+    Reduz a classe majoritária (`NO`) para o tamanho da minoritária (`<30`),
+    aplicado por fold via `imblearn.pipeline.Pipeline` (sem leakage). Dataset
+    final por fold cai de ~65k para ~27k linhas — buscas correspondentemente
+    mais rápidas que SMOTE.
+
+    Trade-off documentado: perda de informação da classe majoritária; é o
+    teste-espelho de SMOTE para a história "balanceamento por reamostragem".
+    """
+    from imblearn.pipeline import Pipeline as ImbPipeline
+    from imblearn.under_sampling import RandomUnderSampler
+
+    return ImbPipeline(steps=[
+        ("clean", RawCleaner()),
+        ("ct", _make_column_transformer(scaler="standard")),
+        ("under", RandomUnderSampler(random_state=RANDOM_STATE)),
+    ])

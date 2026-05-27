@@ -23,6 +23,7 @@ from src.preprocessing import (  # noqa: E402
     build_robust_pipeline,
     build_smote_pipeline,
     build_target_encoding_pipeline,
+    build_undersampling_pipeline,
 )
 from src.search import get_or_run_search  # noqa: E402
 from src.utils import set_global_seed  # noqa: E402
@@ -32,10 +33,12 @@ FACTORIES = {
     "smote": build_smote_pipeline,
     "robust": build_robust_pipeline,
     "target_enc": build_target_encoding_pipeline,
+    "undersample": build_undersampling_pipeline,
 }
 
 INCOMPATIBLE = {
-    ("smote", "stacking"),  # StackingClassifier não casa com pipeline imblearn ext.
+    ("smote", "stacking"),        # StackingClassifier não casa com imblearn pipeline.
+    ("undersample", "stacking"),  # mesma razão.
 }
 
 

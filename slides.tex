@@ -7,7 +7,7 @@
 \usepackage{graphicx}
 \usepackage{booktabs}
 \usepackage{array}
-\usepackage{xcolor}
+\usepackage[table]{xcolor}
 
 \usetheme{Madrid}
 \usecolortheme{seahorse}
@@ -160,43 +160,124 @@ LVQ (GLVQ)           & 0.2648 & 0.0024 & 0.00 \\
 \textbf{Observação.} RF e SVM lideram porque a busca selecionou \texttt{class\_weight="balanced"} (já endereça desbalanceamento na fase de Modeling). LVQ é o mais fraco — protótipos sofrem em 200+ features OHE.
 \end{frame}
 
-\begin{frame}{Comparação baseline vs variantes (parcial)}
-\textbf{Critério de promoção:} diferença positiva \emph{e} p<0.05 em Wilcoxon ou paired t-test (5 folds pareados).
-
-\vspace{0.5em}
+\begin{frame}{F1-macro: panorama visual}
 \centering
-\footnotesize
-\begin{tabular}{llrrcc}
+\includegraphics[width=\linewidth]{reports/figures/baseline_vs_variants_f1.png}
+
+\vspace{0.3em}
+\footnotesize Cada barra = média dos 5 folds da melhor configuração de HP da combinação modelo × pré-processamento. Eixo Y começa em 0.20 pra evidenciar variação.
+\end{frame}
+
+\begin{frame}{Comparação baseline vs variantes — Wilcoxon e paired t}
+\textbf{Critério de promoção:} diferença positiva \emph{e} p<0.05 em Wilcoxon ou paired t-test (5 folds pareados, mesmos folds entre baseline e variante).
+
+\vspace{0.4em}
+\centering
+\tiny
+\begin{tabular}{llrrcrr}
 \toprule
-\textbf{Modelo} & \textbf{Variante} & $F1_{\text{base}}$ & $F1_{\text{var}}$ & $\Delta$ & p (paired t) \\
+\textbf{Modelo} & \textbf{Variante} & $F1_{\text{base}}$ & $F1_{\text{var}}$ & $\Delta$ & wilcoxon p & paired-t p \\
 \midrule
-Decision Tree & SMOTE        & 0.4012 & 0.4190 & \textbf{+0.0178} & \textbf{0.007}$^{*}$ \\
-Decision Tree & RobustScaler & 0.4012 & 0.4012 & +0.0000 & 0.933 \\
-Decision Tree & TargetEnc    & 0.4012 & 0.4067 & \textbf{+0.0055} & \textbf{0.042}$^{*}$ \\
-LVQ           & SMOTE        & 0.2648 & 0.3921 & \textbf{+0.1273} & \textbf{$<$0.001}$^{*}$ \\
-LVQ           & RobustScaler & 0.2648 & 0.2719 & \textbf{+0.0071} & \textbf{0.003}$^{*}$ \\
-LVQ           & TargetEnc    & 0.2648 & 0.2721 & \textbf{+0.0072} & \textbf{$<$0.001}$^{*}$ \\
-Stacking      & RobustScaler & 0.4167 & 0.4164 & --0.0004 & 0.474 \\
-Stacking      & TargetEnc    & 0.4167 & 0.4145 & --0.0022 & 0.062 \\
-KNN           & TargetEnc    & 0.3951 & 0.3854 & --0.0097 & --- \\
+\rowcolor{green!10}
+LVQ           & \textbf{Undersample} & 0.2648 & \textbf{0.4168} & \textbf{+0.1520} & 0.063 & \textbf{$<$0.001}$^{*}$ \\
+\rowcolor{green!10}
+LVQ           & SMOTE        & 0.2648 & \textbf{0.3921} & \textbf{+0.1273} & 0.063 & \textbf{$<$0.001}$^{*}$ \\
+\rowcolor{green!10}
+Decision Tree & SMOTE        & 0.4012 & \textbf{0.4190} & \textbf{+0.0178} & 0.063 & \textbf{0.007}$^{*}$ \\
+\rowcolor{green!10}
+LVQ           & TargetEnc    & 0.2648 & 0.2721 & \textbf{+0.0072} & 0.063 & \textbf{$<$0.001}$^{*}$ \\
+\rowcolor{green!10}
+LVQ           & RobustScaler & 0.2648 & 0.2719 & \textbf{+0.0071} & 0.063 & \textbf{0.003}$^{*}$ \\
+\rowcolor{green!10}
+Decision Tree & TargetEnc    & 0.4012 & 0.4067 & \textbf{+0.0055} & 0.063 & \textbf{0.042}$^{*}$ \\
+\rowcolor{green!10}
+LightGBM      & SMOTE        & 0.4204 & 0.4253 & \textbf{+0.0049} & 0.063 & \textbf{0.016}$^{*}$ \\
+\midrule
+Random Forest & RobustScaler & 0.4512 & 0.4513 & +0.0001 & 0.81 & 0.92 \\
+SVM           & RobustScaler & 0.4471 & 0.4472 & +0.0001 & 0.31 & 0.13 \\
+LightGBM      & RobustScaler & 0.4204 & 0.4208 & +0.0003 & 1.00 & 0.37 \\
+XGBoost       & RobustScaler & 0.4240 & 0.4240 & +0.0000 & 1.00 & 1.00 \\
+XGBoost       & SMOTE        & 0.4240 & 0.4259 & +0.0019 & 0.44 & 0.33 \\
+\midrule
+\rowcolor{red!10}
+Random Forest & SMOTE        & 0.4512 & 0.4298 & \textbf{--0.0214} & 0.063 & \textbf{$<$0.001}$^{*}$ \\
+\rowcolor{red!10}
+SVM           & SMOTE        & 0.4471 & 0.4277 & \textbf{--0.0195} & 0.063 & \textbf{$<$0.001}$^{*}$ \\
+\rowcolor{red!10}
+Random Forest & Undersample  & 0.4512 & 0.4328 & \textbf{--0.0184} & 0.063 & \textbf{$<$0.001}$^{*}$ \\
+\rowcolor{red!10}
+SVM           & Undersample  & 0.4471 & 0.4338 & \textbf{--0.0133} & 0.063 & \textbf{$<$0.001}$^{*}$ \\
+\rowcolor{red!10}
+Random Forest & TargetEnc    & 0.4512 & 0.4439 & --0.0074 & 0.063 & \textbf{0.005}$^{*}$ \\
+\rowcolor{red!10}
+SVM           & TargetEnc    & 0.4471 & 0.4410 & --0.0061 & 0.063 & \textbf{0.001}$^{*}$ \\
+\rowcolor{red!10}
+XGBoost       & TargetEnc    & 0.4240 & 0.4210 & --0.0030 & 0.063 & \textbf{0.045}$^{*}$ \\
 \bottomrule
 \end{tabular}
 
 \vspace{0.3em}
-\footnotesize $^{*}$ = p<0.05. \emph{Wilcoxon} mais conservador (5 folds só dão p=0.0625 mesmo com sinal consistente).
-
-\vspace{0.5em}
-\textbf{Leitura.} SMOTE \alert{ajuda} DT e LVQ (modelos sem balanceamento embutido). Não foi rodado em modelos que já tinham \texttt{class\_weight="balanced"} (RF, SVM).
+\scriptsize $^{*}$ = p<0.05 em paired t-test. Wilcoxon com 5 folds é \emph{conservador} (p mínimo possível = 0.0625).
 
 \vspace{0.3em}
-\textit{Outros pares (LGBM, XGB, RF, MLP × 3 variantes) ainda executando.}
+\footnotesize \textbf{Verde:} variante promovida. \textbf{Vermelho:} variante atrapalha. Outros: empate técnico.
 \end{frame}
 
-\begin{frame}{Modelo vencedor (parcial)}
-\textbf{Líder atual:} \alert{Random Forest baseline} — F1-macro = \textbf{0.4512 $\pm$ 0.0028}.
+\begin{frame}{Contexto: F1 nesse dataset}
+\textbf{Por que F1 $\sim$0.45 é competitivo?}
+
+\vspace{0.5em}
+\begin{itemize}
+  \item Strack et al.\ (2014, paper original do dataset): \textbf{F1-macro $\sim$0.43}.
+  \item Trabalhos posteriores: 0.42--0.48 com feature engineering pesada.
+  \item Acima de 0.55: \alert{suspeito de leakage} (rótulo informa as features de algum jeito).
+\end{itemize}
 
 \vspace{0.6em}
-\textbf{Hiperparâmetros vencedores:}
+\textbf{Por que é difícil?}
+\begin{itemize}
+  \item \texttt{<30} vs \texttt{>30} é uma fronteira \emph{clínica arbitrária}. Paciente que readmite em 28 dias é praticamente indistinguível de um que readmite em 32 dias.
+  \item Forte desbalanceamento: \texttt{<30} = 11\%, \texttt{>30} = 35\%, \texttt{NO} = 54\%.
+  \item Sinais clínicos compartilhados: idade, número de visitas anteriores, diagnósticos crônicos elevam risco \emph{nas duas} classes positivas.
+\end{itemize}
+
+\vspace{0.5em}
+\textbf{Nossa contribuição não é F1 alto:} é uma comparação \emph{metodologicamente rigorosa} entre 10 algoritmos $\times$ 4 pré-processamentos, com Wilcoxon pareado para todas as decisões.
+\end{frame}
+
+\begin{frame}{Achado metodológico: SMOTE não é gratuito}
+\textbf{Padrão claro e simétrico entre SMOTE e Undersampling:}
+
+\vspace{0.6em}
+\begin{itemize}
+  \item \textbf{Reamostragem ajuda} modelos \emph{sem balanceamento embutido}:
+  \begin{itemize}
+    \item LVQ: \textbf{+0.152} com undersample, +0.127 com SMOTE — \emph{maiores ganhos absolutos do estudo}
+    \item Decision Tree: +0.018 com SMOTE, +0.010 com undersample
+    \item LightGBM: +0.005 com SMOTE
+  \end{itemize}
+  \item \textbf{Reamostragem atrapalha} modelos com \texttt{class\_weight="balanced"} (selecionado pela busca HP): Random Forest perde 0.021 (SMOTE) / 0.018 (under); SVM perde 0.020 / 0.013. Ambas reamostragens \emph{deterioram} o classificador já calibrado.
+\end{itemize}
+
+\vspace{0.6em}
+\textbf{Implicações.}
+\begin{itemize}
+  \item Em produção, escolher \emph{uma} estratégia de desbalanceamento e medir, não combinar.
+  \item Custo computacional: SMOTE adiciona $\sim$30\% de linhas sintéticas em cada fold. Para LVQ valeu (ganho 50\%); para RF foi prejuízo de tempo \emph{e} F1.
+\end{itemize}
+
+\vspace{0.6em}
+\textbf{Robust e TargetEnc na maioria dos modelos:} efeito praticamente nulo. Árvores são insensíveis a escala (esperado); TargetEncoder em colunas como \texttt{payer\_code} não compensa a perda de granularidade vs OHE esparso quando há features OHE de baixa cardinalidade abundantes.
+\end{frame}
+
+\begin{frame}{Modelo vencedor}
+\textbf{Vencedor:} \alert{Random Forest} (com pré-processamento baseline ou RobustScaler — \emph{empate técnico}).
+
+\vspace{0.4em}
+\textbf{F1-macro CV:} \textbf{0.4513 $\pm$ 0.0028} (5 folds estratificados).
+
+\vspace{0.6em}
+\textbf{Hiperparâmetros (encontrados na busca):}
 \begin{itemize}
   \item \texttt{n\_estimators=200}, \texttt{max\_depth=20}, \texttt{max\_features="log2"}
   \item \texttt{min\_samples\_leaf=1}, \alert{\texttt{class\_weight="balanced"}}
@@ -205,15 +286,12 @@ KNN           & TargetEnc    & 0.3951 & 0.3854 & --0.0097 & --- \\
 \vspace{0.4em}
 \textbf{Por quê esse vence:}
 \begin{itemize}
-  \item Maior F1-macro entre todas as combinações já avaliadas.
-  \item Diferença vs 2º colocado (SVM) é \emph{não significativa} (Wilcoxon p=0.125): ambos sustentam o pódio.
-  \item \texttt{class\_weight="balanced"} ataca o desbalanceamento sem custo de SMOTE.
-  \item Curva treino vs val mostra overfit moderado ($F1_{tr}=0.84$, $F1_{val}=0.45$) — mas estável entre folds ($\sigma=0.003$).
-  \item Inferência rápida (~ms por amostra), interpretabilidade via importância de features.
+  \item \textbf{Top do ranking} dentre as 29+ combinações avaliadas. SVM 2º (0.4471) — empate técnico no nível ($\Delta$=0.004, Wilcoxon p=0.31).
+  \item \texttt{class\_weight="balanced"} ataca o desbalanceamento \emph{na árvore}, sem custo de SMOTE.
+  \item Curva treino vs val: overfit moderado ($F1_{\text{tr}}$=0.84, $F1_{\text{val}}$=0.45) mas \emph{estável} entre folds ($\sigma$=0.003).
+  \item Inferência rápida ($\sim$ms/amostra), interpretabilidade via importância de features, pronto pra deployment.
+  \item Variantes testadas em RF: \textbf{SMOTE atrapalha} (--0.021, p$<$0.001), \emph{Robust empata}, TargetEnc atrapalha (--0.007).
 \end{itemize}
-
-\vspace{0.4em}
-\footnotesize \textit{Ranking pode mudar quando variantes de LGBM/XGB/MLP terminarem (estimativa: 30-60min).}
 \end{frame}
 
 \begin{frame}{Avaliação final no teste}
