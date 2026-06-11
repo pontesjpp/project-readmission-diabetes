@@ -25,7 +25,7 @@
 \maketitle
 
 \begin{abstract}
-Aplicamos o ciclo CRISP-DM completo ao dataset Diabetes 130-US Hospitals (UCI 296) para classificar a janela de readmissão hospitalar de pacientes diabéticos em \texttt{<30}, \texttt{>30} e \texttt{NO}. O conjunto foi dividido por amostragem estratificada uma única vez ($n_{\text{treino}}=81{,}412$, $n_{\text{teste}}=20{,}354$), e o teste foi mantido isolado por uma guarda de token até a avaliação final. Treinamos os 10 algoritmos obrigatórios sob 5-fold estratificado pareado e busca de hiperparâmetros, otimizando F1-macro. Comparamos pareadamente o pré-processamento baseline contra três variantes (SMOTE, RobustScaler, TargetEncoder). O modelo final \emph{Random Forest} (com \texttt{RobustScaler} e \texttt{class\_weight="balanced"}) alcançou F1-macro de \emph{0{,}455} no teste, com bom desempenho na classe majoritária \texttt{NO} (F1=0{,}672) mas recall de apenas 0{,}196 na classe minoritária \texttt{<30}, justamente a de maior custo clínico. Discutimos riscos de viés, monitoramento e gatilhos de retreinamento para deployment.
+Aplicamos o ciclo CRISP-DM completo ao dataset Diabetes 130-US Hospitals (UCI 296) para classificar a janela de readmissão hospitalar de pacientes diabéticos em \texttt{<30}, \texttt{>30} e \texttt{NO}. O conjunto foi dividido por amostragem estratificada uma única vez ($n_{\text{treino}}=81{,}412$, $n_{\text{teste}}=20{,}354$), e o teste foi mantido isolado por uma guarda de token até a avaliação final. Treinamos os 10 algoritmos obrigatórios sob 5-fold estratificado pareado e busca de hiperparâmetros, otimizando F1-macro. Comparamos pareadamente o pré-processamento baseline contra quatro variantes (SMOTE, undersampling, RobustScaler, TargetEncoder). O modelo final \emph{Random Forest} (com \texttt{RobustScaler} e \texttt{class\_weight="balanced"}) alcançou F1-macro de \emph{0{,}455} no teste, com bom desempenho na classe majoritária \texttt{NO} (F1=0{,}672) mas recall de apenas 0{,}196 na classe minoritária \texttt{<30}, justamente a de maior custo clínico. Discutimos riscos de viés, monitoramento e gatilhos de retreinamento para deployment.
 \end{abstract}
 
 \tableofcontents
@@ -88,6 +88,7 @@ O split é materializado em \texttt{data/interim/} com \texttt{random\_state=42}
 
 \subsection{Variantes}
 \paragraph{SMOTE.} \texttt{imblearn.pipeline.Pipeline} com SMOTE aplicado por fold, sintetizando minoria \texttt{<30} via $k=5$ vizinhos.
+\paragraph{Undersampling.} \texttt{RandomUnderSampler} dentro do \texttt{imblearn.pipeline.Pipeline}, subamostrando as classes majoritárias por fold para equilibrar o treino. Foi a variante de maior ganho para modelos sem balanceamento embutido (ver a comparação pareada na Seção~5).
 \paragraph{RobustScaler.} Substitui StandardScaler nas numéricas. Motivado pela cauda longa em variáveis de contagem.
 \paragraph{TargetEncoder.} Codifica \texttt{payer\_code}, \texttt{medical\_specialty}, \texttt{admission\_*\_id} via \texttt{TargetEncoder(target\_type="multiclass")} do scikit-learn (CV interno anti-leakage). Mantém OHE no resto.
 
