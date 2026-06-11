@@ -36,10 +36,12 @@ FACTORIES = {
     "undersample": build_undersampling_pipeline,
 }
 
-INCOMPATIBLE = {
-    ("smote", "stacking"),        # StackingClassifier não casa com imblearn pipeline.
-    ("undersample", "stacking"),  # mesma razão.
-}
+# Nenhuma combinação é tecnicamente incompatível: smote/undersample com
+# StackingClassifier e com o Comitê de MLPs foram verificados rodando dentro do
+# imblearn.pipeline (resample só na parte de treino de cada fold). Ressalva:
+# stacking+SMOTE gera meta-features sobre dados reamostrados (otimismo contido
+# no fold de treino) — documentado no relatório.
+INCOMPATIBLE: set[tuple[str, str]] = set()
 
 
 def main() -> int:

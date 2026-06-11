@@ -123,7 +123,7 @@ Cada modelo definido em \texttt{src/models.py} via \texttt{ModelSpec} (factory +
 \textbf{Métrica de otimização:} \texttt{f1\_macro}.
 
 \vspace{0.5em}
-\textbf{Estratégia:} Grid em modelos com poucos HPs (DT, KNN, LVQ, Stacking); Randomized (\texttt{n\_iter=5-10}) em modelos com espaço maior (RF, LightGBM, SVM, MLP, MLP Comitê, XGBoost).
+\textbf{Estratégia:} Grid em modelos com poucos HPs (DT, KNN, LVQ, Stacking, Comitê de MLPs); Randomized (\texttt{n\_iter=5-10}) em modelos com espaço maior (RF, LightGBM, SVM, MLP, XGBoost).
 
 \vspace{0.5em}
 \textbf{Curvas treino vs validação} salvas por configuração em \texttt{reports/figures/<modelo>\_\_<tag>\_\_train\_vs\_val.png} (uma figura por modelo $\times$ pré-processamento).
@@ -132,7 +132,7 @@ Cada modelo definido em \texttt{src/models.py} via \texttt{ModelSpec} (factory +
 % ---------------------------------------------------------------
 \section{Evaluation}
 
-\begin{frame}{Baseline — F1-macro por modelo}
+\begin{frame}{Baseline — F1-macro por modelo (CV 5-fold no treino/validação)}
 \centering
 \small
 \begin{tabular}{lccc}
@@ -145,18 +145,15 @@ XGBoost (GPU)        & 0.4240 & 0.0023 & 0.21 \\
 LightGBM             & 0.4204 & 0.0017 & 0.28 \\
 Stacking             & 0.4167 & 0.0021 & 0.06 \\
 MLP                  & 0.4121 & 0.0115 & 0.02 \\
+Comitê de MLPs       & 0.4079 & 0.0055 & 0.05 \\
 Decision Tree        & 0.4012 & 0.0013 & 0.28 \\
-K-NN                 & 0.3951 & 0.0021 & 0.19 \\
+K-NN                 & 0.3956 & 0.0020 & 0.19 \\
 LVQ (GLVQ)           & 0.2648 & 0.0024 & 0.00 \\
-\textit{Comitê MLPs}* & \textit{em execução} & --- & --- \\
 \bottomrule
 \end{tabular}
 
-\vspace{0.3em}
-\footnotesize $^*$resultado a inserir após término da busca.
-
 \vspace{0.5em}
-\textbf{Observação.} RF e SVM lideram porque a busca selecionou \texttt{class\_weight="balanced"} (já endereça desbalanceamento na fase de Modeling). LVQ é o mais fraco — protótipos sofrem em 200+ features OHE.
+\textbf{Observação.} RF e SVM lideram porque a busca selecionou \texttt{class\_weight="balanced"} (já endereça desbalanceamento na fase de Modeling). O Comitê de MLPs (10 estimadores, bootstrap de 60\% das amostras) fica no pelotão intermediário, junto do MLP isolado. LVQ é o mais fraco — protótipos sofrem em 200+ features OHE.
 \end{frame}
 
 \begin{frame}{F1-macro: panorama visual}
@@ -165,10 +162,13 @@ LVQ (GLVQ)           & 0.2648 & 0.0024 & 0.00 \\
 
 \vspace{0.3em}
 \footnotesize Cada barra = média dos 5 folds da melhor configuração de HP da combinação modelo × pré-processamento. Eixo Y começa em 0.20 pra evidenciar variação.
+
+\vspace{0.2em}
+\footnotesize\alert{Todos os valores deste gráfico são de validação cruzada (5-fold) no conjunto de \textbf{treino} — nenhum número de teste aqui. O teste só aparece no slide ``Avaliação final no teste''.}
 \end{frame}
 
-\begin{frame}[shrink=5]{Comparação baseline vs variantes — resultados significativos}
-\textbf{Critério:} p$<$0.05 em paired t-test (5 folds pareados). Wilcoxon com 5 folds é \emph{conservador} (p mín.\ = 0.0625, nunca atinge 0.05).
+\begin{frame}[shrink=20]{Comparação baseline vs variantes — resultados significativos}
+\textbf{Critério:} p$<$0.05 em paired t-test (5 folds pareados). Wilcoxon com 5 folds é \emph{conservador} (p mín.\ = 0.0625, nunca atinge 0.05). \alert{Todos os $F1$ desta tabela são de validação cruzada no \textbf{treino}, não do teste.}
 
 \vspace{0.2em}
 \centering
@@ -181,8 +181,20 @@ LVQ (GLVQ)           & 0.2648 & 0.0024 & 0.00 \\
 LVQ           & \textbf{Undersample} & 0.2648 & \textbf{0.4168} & \textbf{+0.152} & 0.062 & \textbf{$<$0.001}$^{*}$ \\
 \rowcolor{green!10}
 LVQ           & SMOTE        & 0.2648 & 0.3921 & +0.127 & 0.062 & \textbf{$<$0.001}$^{*}$ \\
+\rowcolor{green!20}
+Comitê de MLPs & \textbf{SMOTE} & 0.4079 & \textbf{0.4490} & \textbf{+0.041} & 0.062 & \textbf{$<$0.001}$^{*}$ \\
+\rowcolor{green!10}
+MLP           & SMOTE        & 0.4121 & 0.4387 & +0.027 & 0.062 & \textbf{0.005}$^{*}$ \\
+\rowcolor{green!10}
+Stacking      & Undersample  & 0.4167 & 0.4384 & +0.022 & 0.062 & \textbf{$<$0.001}$^{*}$ \\
+\rowcolor{green!10}
+Comitê de MLPs & Undersample & 0.4079 & 0.4283 & +0.020 & 0.062 & \textbf{0.001}$^{*}$ \\
+\rowcolor{green!10}
+XGBoost       & Undersample  & 0.4240 & 0.4419 & +0.018 & 0.062 & \textbf{$<$0.001}$^{*}$ \\
 \rowcolor{green!10}
 Decision Tree & SMOTE        & 0.4012 & 0.4190 & +0.018 & 0.062 & \textbf{0.007}$^{*}$ \\
+\rowcolor{green!10}
+LightGBM      & Undersample  & 0.4204 & 0.4370 & +0.017 & 0.062 & \textbf{0.001}$^{*}$ \\
 \rowcolor{green!10}
 LVQ           & TargetEnc    & 0.2648 & 0.2721 & +0.007 & 0.062 & \textbf{0.001}$^{*}$ \\
 \rowcolor{green!10}
@@ -192,6 +204,8 @@ Decision Tree & TargetEnc    & 0.4012 & 0.4067 & +0.006 & 0.062 & \textbf{0.042}
 \rowcolor{green!10}
 LightGBM      & SMOTE        & 0.4204 & 0.4253 & +0.005 & 0.062 & \textbf{0.016}$^{*}$ \\
 \midrule
+\rowcolor{red!20}
+Stacking      & \textbf{SMOTE} & 0.4167 & 0.3885 & \textbf{--0.028} & 0.062 & \textbf{$<$0.001}$^{*}$ \\
 \rowcolor{red!10}
 Random Forest & SMOTE        & 0.4512 & 0.4298 & --0.021 & 0.062 & \textbf{$<$0.001}$^{*}$ \\
 \rowcolor{red!10}
@@ -275,8 +289,9 @@ Stacking      & RobustScaler & 0.4167 & 0.4164 & --0.000 & 0.474 \\
   \item \textbf{Reamostragem ajuda} modelos \emph{sem balanceamento embutido}:
   \begin{itemize}
     \item LVQ: \textbf{+0.152} com undersample, +0.127 com SMOTE — \emph{maiores ganhos absolutos do estudo}
-    \item Decision Tree: +0.018 com SMOTE, +0.010 com undersample
-    \item LightGBM: +0.005 com SMOTE
+    \item \textbf{Comitê de MLPs: +0.041 com SMOTE} — sobe ao 2º melhor F1 geral (0.449)
+    \item MLP: +0.027 (SMOTE) / +0.025 (undersample); Decision Tree: +0.018 (SMOTE)
+    \item Boostings com undersample: XGBoost +0.018, LightGBM +0.017; Stacking +0.022
   \end{itemize}
   \item \textbf{Reamostragem atrapalha} modelos com \texttt{class\_weight="balanced"} (selecionado pela busca HP): Random Forest perde 0.021 (SMOTE) / 0.018 (under); SVM perde 0.020 / 0.013. Ambas reamostragens \emph{deterioram} o classificador já calibrado.
 \end{itemize}
@@ -311,7 +326,7 @@ Stacking      & RobustScaler & 0.4167 & 0.4164 & --0.000 & 0.474 \\
 \vspace{0.3em}
 \textbf{Por quê esse vence:}
 \begin{itemize}\setlength{\itemsep}{1pt}
-  \item \textbf{Top do ranking} dentre as 29+ combinações avaliadas. SVM 2º (0.4471) — empate técnico ($\Delta$=0.004, Wilcoxon p=0.31).
+  \item \textbf{Top do ranking} dentre as \textbf{50} combinações avaliadas (10 modelos × 5 pré-proc.). 2º Comitê de MLPs+SMOTE (0.4490), 3º SVM (0.4471) — ambos empate técnico ($\Delta<$0.005, sem significância).
   \item \texttt{class\_weight="balanced"} ataca o desbalanceamento \emph{na árvore}, sem custo de SMOTE.
   \item Curva treino vs val: overfit moderado ($F1_{\text{tr}}$=0.84, $F1_{\text{val}}$=0.45) mas \emph{estável} entre folds ($\sigma$=0.003).
   \item Inferência rápida ($\sim$ms/amostra), interpretabilidade via importância de features, pronto pra deployment.

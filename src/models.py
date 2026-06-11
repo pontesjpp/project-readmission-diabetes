@@ -79,6 +79,24 @@ class MLPStringLabel(MLPClassifier):
         return self._le.inverse_transform(super().predict(X))
 
 
+class KNNStringLabel(KNeighborsClassifier):
+    """KNN com rótulos string codificados em inteiros.
+
+    Em entradas densas (ex.: após SMOTE, que densifica a matriz OHE) o caminho
+    otimizado `ArgKminClassMode` do sklearn tenta converter os rótulos de classe
+    para `int` e estoura `ValueError: invalid literal for int() with base 10:
+    '<30'`. Encodamos no fit e desfazemos no predict. Top-level por causa do
+    pickle do joblib quando clonado para workers (`n_jobs>1`).
+    """
+
+    def fit(self, X, y, **kw):
+        self._le = LabelEncoder()
+        return super().fit(X, self._le.fit_transform(y), **kw)
+
+    def predict(self, X):
+        return self._le.inverse_transform(super().predict(X))
+
+
 @dataclass(frozen=True)
 class ModelSpec:
     name: str
@@ -171,7 +189,7 @@ LGBM_GRID: dict[str, list[Any]] = {
 
 
 def _make_knn(prep_factory: PrepFactory) -> Pipeline:
-    return _wrap(prep_factory, KNeighborsClassifier(n_jobs=2))
+    return _wrap(prep_factory, KNNStringLabel(n_jobs=2))
 
 
 KNN_GRID: dict[str, list[Any]] = {
@@ -301,10 +319,13 @@ LVQ_GRID: dict[str, list[Any]] = {
 def _make_mlp_committee(prep_factory: PrepFactory) -> Pipeline:
     from sklearn.ensemble import BaggingClassifier
 
+    # Grid reduzido por restrição de recursos (mesma lógica do Stacking abaixo):
+    # comitê de MLPs em 81k×203 com early_stopping; max_iter e max_samples controlam
+    # o custo mantendo o comitê heterogêneo (bootstrap de amostras).
     base_mlp = MLPStringLabel(
         random_state=RANDOM_STATE,
         early_stopping=True,
-        max_iter=200,
+        max_iter=120,
         hidden_layer_sizes=(64,),
     )
     return _wrap(
@@ -313,16 +334,20 @@ def _make_mlp_committee(prep_factory: PrepFactory) -> Pipeline:
             estimator=base_mlp,
             random_state=RANDOM_STATE,
             n_estimators=10,
+            max_samples=0.6,
             n_jobs=2,
         ),
     )
 
 
+# Grid enxuto: 1 candidato (comitê de 10 MLPs, bootstrap de 60% das amostras).
+# Tamanho dimensionado para uma busca de ~3-4 min; a redução vs. um comitê maior
+# é documentada como restrição de recursos.
 MLP_COMMITTEE_GRID: dict[str, list[Any]] = {
-    "clf__n_estimators": [5, 10],
-    "clf__max_samples": [1.0],
+    "clf__n_estimators": [10],
+    "clf__max_samples": [0.6],
     "clf__estimator__hidden_layer_sizes": [(64,)],
-    "clf__estimator__alpha": [1e-4, 1e-2],
+    "clf__estimator__alpha": [1e-4],
 }
 
 
@@ -459,9 +484,8 @@ MODEL_REGISTRY: dict[str, ModelSpec] = {
         name="mlp_committee",
         make_pipeline=_make_mlp_committee,
         param_grid=MLP_COMMITTEE_GRID,
-        search="randomized",
-        n_iter=8,
-        notes="Comitê de MLPs via BaggingClassifier (bootstrap de amostras e features).",
+        search="grid",
+        notes="Comitê de MLPs via BaggingClassifier (bootstrap de amostras); grid enxuto pelo custo.",
     ),
     "stacking": ModelSpec(
         name="stacking",

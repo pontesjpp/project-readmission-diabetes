@@ -1,4 +1,4 @@
-% IF1014 — Relatório final (entrega 10/06/2026, máx. 25 páginas, sem apêndices).
+% IF1014, Relatório final (entrega 10/06/2026, máx. 25 páginas, sem apêndices).
 % Compilação: pdflatex relatorio.tex (duas passadas para refs/citações)
 \documentclass[12pt,a4paper]{article}
 \usepackage[utf8]{inputenc}
@@ -17,15 +17,15 @@
 
 \hypersetup{colorlinks=true, urlcolor=blue, linkcolor=black, citecolor=black}
 
-\title{Previsão de readmissão hospitalar em pacientes diabéticos\\\large IF1014 — Mineração de Dados Aplicada (CRISP-DM)}
-\author{Equipe \textit{[a preencher]} \\ UFPE — 2026.1}
+\title{Previsão de readmissão hospitalar em pacientes diabéticos\\\large IF1014, Mineração de Dados Aplicada (CRISP-DM)}
+\author{João Pontes \and Marcos Antonio \and Theo Barza \\ UFPE, 2026.1}
 \date{10 de junho de 2026}
 
 \begin{document}
 \maketitle
 
 \begin{abstract}
-Aplicamos o ciclo CRISP-DM completo ao dataset Diabetes 130-US Hospitals (UCI 296) para classificar a janela de readmissão hospitalar de pacientes diabéticos em \texttt{<30}, \texttt{>30} e \texttt{NO}. O conjunto foi dividido por amostragem estratificada uma única vez ($n_{\text{treino}}=81{,}412$, $n_{\text{teste}}=20{,}354$), e o teste foi mantido isolado por uma guarda de token até a avaliação final. Treinamos os 10 algoritmos obrigatórios sob 5-fold estratificado pareado e busca de hiperparâmetros, otimizando F1-macro. Comparamos pareadamente o pré-processamento baseline contra três variantes (SMOTE, RobustScaler, TargetEncoder). O modelo final \emph{[a preencher]} alcançou F1-macro de \emph{[X.XXX]} no teste, com \emph{[análise sintética por classe]}. Discutimos riscos de viés, monitoramento e gatilhos de retreinamento para deployment.
+Aplicamos o ciclo CRISP-DM completo ao dataset Diabetes 130-US Hospitals (UCI 296) para classificar a janela de readmissão hospitalar de pacientes diabéticos em \texttt{<30}, \texttt{>30} e \texttt{NO}. O conjunto foi dividido por amostragem estratificada uma única vez ($n_{\text{treino}}=81{,}412$, $n_{\text{teste}}=20{,}354$), e o teste foi mantido isolado por uma guarda de token até a avaliação final. Treinamos os 10 algoritmos obrigatórios sob 5-fold estratificado pareado e busca de hiperparâmetros, otimizando F1-macro. Comparamos pareadamente o pré-processamento baseline contra três variantes (SMOTE, RobustScaler, TargetEncoder). O modelo final \emph{Random Forest} (com \texttt{RobustScaler} e \texttt{class\_weight="balanced"}) alcançou F1-macro de \emph{0{,}455} no teste, com bom desempenho na classe majoritária \texttt{NO} (F1=0{,}672) mas recall de apenas 0{,}196 na classe minoritária \texttt{<30}, justamente a de maior custo clínico. Discutimos riscos de viés, monitoramento e gatilhos de retreinamento para deployment.
 \end{abstract}
 
 \tableofcontents
@@ -41,7 +41,7 @@ O cliente \emph{SI5 Health} atua no setor de \emph{cuidado hospitalar pós-alta}
   \item Métrica principal: F1-macro sobre o teste.
   \item Métricas secundárias: balanced accuracy, ROC-AUC e PR-AUC macro multiclasse, métricas por classe.
   \item Métrica operacional crítica: recall(\texttt{<30}).
-  \item Capacidade da fila pós-alta: \emph{[X pacientes/dia]} — calibração de limiar acontece nesse teto.
+  \item Capacidade da fila pós-alta: hipótese de $\approx$30 pacientes/dia, calibração de limiar acontece nesse teto.
 \end{itemize}
 
 \section{Data Understanding e EDA}
@@ -49,7 +49,7 @@ O cliente \emph{SI5 Health} atua no setor de \emph{cuidado hospitalar pós-alta}
 Strack et al.\ (2014) consolidaram 101.766 encontros entre 1999 e 2008 em 130 hospitais americanos. Cada linha é uma internação de paciente diabético, com 50 atributos clínicos, demográficos e operacionais. O alvo \texttt{readmitted} é trinário.
 
 \subsection{Distribuição da classe alvo}
-A figura~\ref{fig:eda_class} resume a distribuição no treino após o split. A classe \texttt{<30} representa 11{,}2\% — minoritária, motivando F1-macro como métrica.
+A figura~\ref{fig:eda_class} resume a distribuição no treino após o split. A classe \texttt{<30} representa 11{,}2\%, minoritária, motivando F1-macro como métrica.
 \begin{figure}[h]
   \centering
   \includegraphics[width=0.62\linewidth]{reports/figures/eda_class_balance.png}
@@ -118,13 +118,77 @@ Modelos com poucos HPs usam GridSearchCV; com espaço maior, RandomizedSearchCV 
 
 \section{Evaluation}
 \subsection{Resultados do baseline}
-\textit{Inserir tabela \texttt{df\_summary} da Seção 5 do notebook (F1-macro e desvio por modelo no baseline).}
+A Tabela~\ref{tab:baseline} traz o F1-macro de validação (CV 5-fold no treino) de cada um dos 10 algoritmos no pré-processamento baseline. Random Forest e SVM lideram; LVQ é o mais fraco (protótipos sofrem em 200+ dimensões OHE). O \emph{gap treino$-$validação} separa dois regimes: modelos baseados em árvore (RF, XGBoost, LightGBM, Árvore) decoram o treino (gap 0{,}21--0{,}39), enquanto SVM, MLP, Stacking, Comitê e LVQ generalizam com gap quase nulo.
+
+\begin{table}[h]\centering
+\small
+\begin{tabular}{lccc}
+\toprule
+\textbf{Modelo} & \textbf{F1-macro CV} & \textbf{$\sigma$ (folds)} & \textbf{Gap treino$-$val} \\
+\midrule
+Random Forest      & \textbf{0{,}4512} & 0{,}0028 & 0{,}390 \\
+SVM (LinearSVC)    & 0{,}4471 & 0{,}0024 & 0{,}006 \\
+XGBoost            & 0{,}4240 & 0{,}0023 & 0{,}212 \\
+LightGBM           & 0{,}4204 & 0{,}0017 & 0{,}282 \\
+Stacking           & 0{,}4167 & 0{,}0021 & 0{,}057 \\
+MLP                & 0{,}4121 & 0{,}0115 & 0{,}016 \\
+Comitê de MLPs     & 0{,}4079 & 0{,}0055 & 0{,}048 \\
+Árvore de Decisão  & 0{,}4012 & 0{,}0013 & 0{,}280 \\
+K-NN               & 0{,}3956 & 0{,}0020 & 0{,}194 \\
+LVQ                & 0{,}2648 & 0{,}0024 & 0{,}001 \\
+\bottomrule
+\end{tabular}
+\caption{F1-macro por modelo no baseline (CV 5-fold estratificada no treino). Gap = F1 treino $-$ F1 validação.}
+\label{tab:baseline}
+\end{table}
 
 \subsection{Curvas treino vs validação}
-\textit{Mostrar exemplos representativos de \texttt{reports/figures/<modelo>\_\_baseline\_\_train\_vs\_val.png} para 2--3 modelos. Discutir gap treino/val (overfit, underfit, sweet spot).}
+Geramos a curva treino vs.\ validação para \emph{cada} configuração de hiperparâmetro de \emph{todos} os 10 modelos $\times$ 5 pré-processamentos (50 figuras em \texttt{reports/figures/<modelo>\_\_<tag>\_\_train\_vs\_val.png}). A Figura~\ref{fig:curvas} contrasta dois regimes: o Random Forest (esquerda) tem treino $\approx$0{,}84 contra validação $\approx$0{,}45, overfit grande, mas estável entre folds; o SVM (direita) praticamente cola treino e validação ($\approx$0{,}45), sinal de viés/underfit do classificador linear. Em ambos a validação satura cedo, confirmando que o teto $\sim$0{,}45 é do problema, não da busca.
+
+\begin{figure}[h]
+\centering
+\begin{subfigure}{0.49\linewidth}
+  \includegraphics[width=\linewidth]{reports/figures/random_forest__baseline__train_vs_val.png}
+  \caption{Random Forest (overfit).}
+\end{subfigure}
+\begin{subfigure}{0.49\linewidth}
+  \includegraphics[width=\linewidth]{reports/figures/svm__baseline__train_vs_val.png}
+  \caption{SVM (viés/underfit).}
+\end{subfigure}
+\caption{Curvas treino vs.\ validação (baseline). Os 50 gráficos completos estão em \texttt{reports/figures/}.}
+\label{fig:curvas}
+\end{figure}
 
 \subsection{Comparação pareada baseline vs variantes}
-\textit{Inserir tabela \texttt{df\_pair} da Seção 7. Resumir quais (modelo $\times$ variante) tiveram p<0.05 e diferença positiva. Para cada par significativo, reportar a diferença média e o p-valor de Wilcoxon e paired t-test.}
+Para cada par (modelo, variante) aplicamos Wilcoxon pareado \emph{e} paired t-test sobre os mesmos 5 folds. Com apenas 5 folds, o Wilcoxon atinge no mínimo $p=0{,}0625$, nunca cruza 0{,}05, então a decisão de promover usa o paired t-test ($p_t$), reportando ambos por transparência. Das 40 comparações, \textbf{17 promovem a variante} ($\Delta>0$ e $p_t<0{,}05$). A Tabela~\ref{tab:pair} resume os extremos.
+
+O padrão é nítido e simétrico: \textbf{reamostragem (SMOTE/undersample) ajuda modelos sem balanceamento embutido}, LVQ ($+0{,}152$ com undersample!), Comitê de MLPs ($+0{,}041$ com SMOTE), MLP, e os boostings com undersample, mas \textbf{degrada os que já usam} \texttt{class\_weight="balanced"} (RF $-0{,}021$, SVM $-0{,}019$ com SMOTE). O Stacking+SMOTE é o pior caso ($-0{,}028$), coerente com a ressalva de que sua CV interna gera meta-features sobre dados sintéticos. RobustScaler é praticamente nulo (árvores/SVM já invariantes a escala) e TargetEncoder degrada modelos sensíveis a representação (K-NN, MLP).
+
+\begin{table}[h]\centering
+\small
+\begin{tabular}{llrrr}
+\toprule
+\textbf{Modelo} & \textbf{Variante} & $F1_{\text{base}}$ & $F1_{\text{var}}$ & $\Delta$ ($p_t$) \\
+\midrule
+\multicolumn{5}{l}{\textit{Promovidas ($\Delta>0$, $p_t<0{,}05$)}}\\
+LVQ            & undersample & 0{,}265 & 0{,}417 & $+$0{,}152 ($<$0{,}001) \\
+LVQ            & SMOTE       & 0{,}265 & 0{,}392 & $+$0{,}127 ($<$0{,}001) \\
+Comitê de MLPs & SMOTE      & 0{,}408 & 0{,}449 & $+$0{,}041 ($<$0{,}001) \\
+MLP            & SMOTE       & 0{,}412 & 0{,}439 & $+$0{,}027 (0{,}005) \\
+Stacking       & undersample & 0{,}417 & 0{,}438 & $+$0{,}022 ($<$0{,}001) \\
+XGBoost        & undersample & 0{,}424 & 0{,}442 & $+$0{,}018 ($<$0{,}001) \\
+LightGBM       & undersample & 0{,}420 & 0{,}437 & $+$0{,}017 (0{,}001) \\
+\midrule
+\multicolumn{5}{l}{\textit{Degradam ($\Delta<0$, $p_t<0{,}05$)}}\\
+Stacking       & SMOTE       & 0{,}417 & 0{,}389 & $-$0{,}028 ($<$0{,}001) \\
+Random Forest  & SMOTE       & 0{,}451 & 0{,}430 & $-$0{,}021 ($<$0{,}001) \\
+SVM            & SMOTE       & 0{,}447 & 0{,}428 & $-$0{,}019 ($<$0{,}001) \\
+Random Forest  & undersample & 0{,}451 & 0{,}433 & $-$0{,}018 ($<$0{,}001) \\
+\bottomrule
+\end{tabular}
+\caption{Comparação pareada baseline vs.\ variante (Wilcoxon e paired t-test sobre 5 folds; $p_t$ = paired t-test). Tabela completa das 40 comparações em \texttt{reports/cv\_results/paired\_baseline\_vs\_variants.csv}.}
+\label{tab:pair}
+\end{table}
 
 \begin{figure}[h]
   \centering
@@ -134,23 +198,105 @@ Modelos com poucos HPs usam GridSearchCV; com espaço maior, RandomizedSearchCV 
 \end{figure}
 
 \subsection{Seleção do modelo final}
-\textit{Justificar a escolha. Discutir custo computacional e interpretabilidade.}
+O ranking unificado das 50 combinações coloca o \textbf{Random Forest} no topo, com F1-macro de validação \textbf{0{,}4513 $\pm$ 0{,}0028}, empate técnico entre baseline e RobustScaler ($\Delta<10^{-3}$, sem significância). A busca selecionou \texttt{n\_estimators=200}, \texttt{max\_depth=20}, \texttt{max\_features="log2"}, \texttt{min\_samples\_leaf=1} e \texttt{class\_weight="balanced"}; este último ataca o desbalanceamento dentro do classificador, explicando por que reamostragem o \emph{piora}. O 2º lugar é o Comitê de MLPs+SMOTE (0{,}4490) e o 3º o SVM (0{,}4471), ambos sem diferença significativa para o RF. O desempate seguiu o briefing: o RF tem inferência em $\sim$ms/amostra, fornece importância de variáveis para auditoria de viés e é robusto a escala, escolhemos a variante \texttt{RobustScaler} (equivalente em F1 e mais estável às caudas longas das contagens). O gap treino$-$validação alto (0{,}84 vs 0{,}45) revela capacidade ociosa, mas a variância mínima entre folds ($\sigma=0{,}003$) confirma estabilidade.
+
+\subsection{Matrizes de confusão por algoritmo}
+Para cada algoritmo geramos a matriz de confusão normalizada do melhor modelo no baseline \emph{e} na sua melhor variante, a partir de predições \emph{out-of-fold} (\texttt{cross\_val\_predict}, mesma CV das buscas), portanto métricas de treino/validação, sem tocar o teste. As 20 figuras estão em \texttt{reports/figures/cm\_\_<modelo>\_\_<tag>.png}; a Figura~\ref{fig:cm_rf} mostra o vencedor. Em todos os modelos o padrão se repete: a classe minoritária \texttt{<30} é a mais confundida (majoritariamente classificada como \texttt{>30} ou \texttt{NO}), o que motiva a calibração de limiar no deployment.
+
+\begin{figure}[h]
+\centering
+\begin{subfigure}{0.49\linewidth}
+  \includegraphics[width=\linewidth]{reports/figures/cm__random_forest__baseline.png}
+  \caption{RF baseline.}
+\end{subfigure}
+\begin{subfigure}{0.49\linewidth}
+  \includegraphics[width=\linewidth]{reports/figures/cm__random_forest__robust.png}
+  \caption{RF RobustScaler (variante vencedora).}
+\end{subfigure}
+\caption{Matrizes de confusão normalizadas do Random Forest (out-of-fold, treino/validação).}
+\label{fig:cm_rf}
+\end{figure}
+
+\subsection{Por que F1-macro $\sim$0,45 é competitivo}
+O F1-macro $\sim$0,45 não reflete deficiência de modelagem, e sim o teto de informação do problema. A fronteira \texttt{<30} vs.\ \texttt{>30} é clinicamente arbitrária (readmitir em 28 ou 32 dias é praticamente indistinguível), o alvo depende fortemente de fatores ausentes do dataset (suporte social, adesão, acesso pós-alta), e o F1-\emph{macro} pondera igualmente a classe minoritária \texttt{<30}, a mais difícil. O ROC-AUC macro de 0{,}674 quantifica esse sinal fraco porém real, em linha com a literatura: estudos de readmissão em 30 dias sobre este mesmo dataset reportam tipicamente AUC entre 0{,}65 e 0{,}70.
+
+Resultados aparentemente superiores na literatura quase sempre decorrem de (i) \emph{binarização} do alvo (\texttt{<30} vs.\ resto), tarefa mais fácil e não comparável; (ii) reporte de \emph{acurácia}, dominada pela classe majoritária \texttt{NO} (54\%), em vez de F1-macro; ou (iii) \emph{vazamento} (reamostragem/codificação antes do split, ou uso do teste na seleção). Valores honestos de F1-macro trinário acima de $\sim$0{,}55 nesse dataset são suspeitos de uma dessas causas.
+
+Quanto a \emph{deep learning}: para dados tabulares predominantemente categóricos como este, modelos baseados em árvore seguem superando redes profundas\footnote{Grinsztajn, Oyallon \& Varoquaux. \emph{Why do tree-based models still outperform deep learning on tabular data?} NeurIPS 2022. \url{https://arxiv.org/abs/2207.08815}}. O próprio estudo confirma isso internamente --- MLP (0{,}412), Comitê de MLPs (0{,}408) e Stacking (0{,}417) ficaram \emph{abaixo} do Random Forest (0{,}451). O ganho real viria de engenharia de características com domínio (índices de comorbidade dos códigos ICD, padrões de troca de medicação, recência de visitas), aprendizado sensível a custo, reformulação binária com calibração de limiar para o objetivo operacional, ou dados externos --- não de uma arquitetura mais complexa. A contribuição do trabalho está, portanto, no \textbf{rigor metodológico} (split intocado, 50 combinações comparadas com teste pareado, sem vazamento), que separa este resultado dos números inflados frequentes na literatura aplicada.
 
 \section{Avaliação no conjunto de teste}
-\textit{Inserir matriz de confusão (figura \texttt{reports/figures/final\_confusion.png}), ROC macro (\texttt{final\_\_roc.png}), PR macro (\texttt{final\_\_pr.png}) e tabela do classification report. Discutir o gap entre F1-macro de CV e F1-macro de teste.}
+Refit do Random Forest (RobustScaler, \texttt{class\_weight="balanced"}) em todo o treino e \emph{única} predição no teste isolado (destravado pelo token na Seção 9 do notebook):
+\begin{itemize}
+  \item \textbf{F1-macro (teste) = 0{,}4553}; F1-macro (CV) = 0{,}4513 $\pm$ 0{,}0028; \textbf{$\Delta$ = $+$0{,}0041}.
+  \item Balanced accuracy = 0{,}4530; ROC-AUC macro = 0{,}6737; PR-AUC macro = 0{,}4739.
+\end{itemize}
+
+\begin{table}[h]\centering
+\small
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Classe} & \textbf{Precisão} & \textbf{Recall} & \textbf{F1} & \textbf{Suporte} \\
+\midrule
+\texttt{<30}    & 0{,}241 & 0{,}196 & 0{,}216 & 2.272 \\
+\texttt{>30}    & 0{,}477 & 0{,}479 & 0{,}478 & 7.109 \\
+\texttt{NO}     & 0{,}661 & 0{,}684 & 0{,}672 & 10.973 \\
+\midrule
+\textbf{macro}  & 0{,}459 & 0{,}453 & 0{,}455 & 20.354 \\
+\bottomrule
+\end{tabular}
+\caption{Relatório de classificação no teste (Random Forest, RobustScaler).}
+\label{tab:test}
+\end{table}
+
+\begin{figure}[h]
+\centering
+\begin{subfigure}{0.32\linewidth}
+  \includegraphics[width=\linewidth]{reports/figures/final_confusion.png}
+  \caption{Matriz normalizada.}
+\end{subfigure}
+\begin{subfigure}{0.32\linewidth}
+  \includegraphics[width=\linewidth]{reports/figures/final__roc.png}
+  \caption{ROC macro.}
+\end{subfigure}
+\begin{subfigure}{0.32\linewidth}
+  \includegraphics[width=\linewidth]{reports/figures/final__pr.png}
+  \caption{PR macro.}
+\end{subfigure}
+\caption{Avaliação final no teste, Random Forest (RobustScaler).}
+\label{fig:final}
+\end{figure}
+
+\textbf{Gap CV$\rightarrow$teste e leitura por classe.} O $\Delta$ de apenas $+0{,}004$ entre validação e teste confirma que a seleção via CV \emph{não} sofreu overfit ao processo de busca, o pipeline generaliza. A classe \texttt{NO} domina o acerto (F1=0{,}672); a crítica \texttt{<30} tem F1=0{,}216 e \textbf{recall de só 0{,}196}, ou seja, $\approx$80\% dos pacientes de alto risco passam despercebidos no ponto de operação padrão. Isso reforça que, em produção, o limiar sobre \texttt{predict\_proba(<30)} deve ser calibrado para elevar esse recall até o teto da fila de acompanhamento, aceitando mais falsos positivos (custo operacional menor que o de uma readmissão precoce não assistida).
 
 \section{Deployment, riscos e monitoramento}
-\subsection{Cenário de uso}
-Escore acionado na alta; pacientes \texttt{<30} entram em fila de acompanhamento (ligação 48h, retorno 7d, revisão farmacoterapia).
 
-\subsection{Riscos}
-Viés demográfico, falso negativo da classe \texttt{<30}, drift de população, privacidade. Mitigações em texto.
+\subsection{Cenário de uso e integração}
+O modelo é entregue como um serviço de escore acionado na alta de cada paciente diabético, integrado ao prontuário eletrônico. A predição alimenta uma fila de acompanhamento ativo: pacientes sinalizados como \texttt{<30} recebem ligação de enfermagem em 48h, agendamento de retorno em 7 dias e revisão da farmacoterapia. O escore é apoio à decisão clínica, nunca substituição: a equipe pós-alta pode incluir ou remover pacientes da fila por julgamento clínico, e toda decisão automatizada fica registrada para auditoria. A inferência do Random Forest custa da ordem de milissegundos por paciente, compatível com a restrição operacional de latência do briefing ($<200$ ms).
 
-\subsection{Monitoramento}
-F1-macro mensal estratificado, PSI semanal nas top-15 features, métricas de aceitação clínica do alerta.
+\subsection{Ponto de operação e calibração de limiar}
+A seleção do modelo otimizou F1-macro, mas a operação exige um ajuste adicional. No limiar padrão (\texttt{argmax} da probabilidade), o recall da classe \texttt{<30} é de apenas 0{,}196, ou seja, cerca de 80\% dos pacientes de alto risco não são sinalizados, o que é inaceitável dado o custo assimétrico do falso negativo. Por isso o ponto de operação é definido por calibração de limiar sobre \texttt{predict\_proba(<30)}: baixamos o limiar para elevar o recall da classe crítica até o teto de capacidade da fila ($\approx$30 pacientes/dia na hipótese de uso), aceitando mais falsos positivos. O custo de um falso positivo (uma ligação de acompanhamento desnecessária) é muito menor que o de um falso negativo (readmissão precoce sem suporte), então a curva precisão/recall, e não o F1-macro, guia o limiar final. Esse limiar é revisto periodicamente conforme a capacidade do time muda.
 
-\subsection{Retreinamento}
-Gatilhos: PSI>0.25 em $\geq$3 features, F1 mensal cai >0.05 vs teste, ou rotina trimestral.
+\subsection{Riscos e mitigações}
+\begin{itemize}
+  \item \textbf{Viés demográfico.} As variáveis \texttt{race} (com nível ``Other'' e alta ausência), \texttt{gender} e \texttt{age} podem carregar viés histórico de acesso e tratamento. Mitigação: auditoria de \emph{disparate impact ratio} por subgrupo antes do go-live e relatório mensal de F1-macro e recall(\texttt{<30}) estratificados por raça, gênero e faixa etária; bloqueio de promoção se houver disparidade material entre subgrupos.
+  \item \textbf{Falso negativo da classe \texttt{<30}.} É o erro de maior custo clínico. Mitigação: limiar conservador (item anterior), além de revisão clínica por exceção dos casos de borda (probabilidade próxima ao limiar) encaminhados ao time.
+  \item \textbf{Drift de população.} Expansão para nova unidade ou mudança no perfil de pacientes pode invalidar o pipeline. Mitigação: monitoramento semanal de drift (PSI/KS) nas variáveis de maior peso (\texttt{number\_inpatient}, \texttt{discharge\_disposition\_id}, \texttt{diag\_*} agrupado, número de medicações).
+  \item \textbf{Privacidade.} Dados clínicos sensíveis. Mitigação: treino offline sobre dados pseudonimizados, inferência restrita ao escopo da própria conta hospitalar, retenção mínima e sem persistência de dados crus fora de \texttt{data/raw/}.
+  \item \textbf{Qualidade e dependência de dados.} O pipeline assume a codificação ICD-9 e os identificadores operacionais do dataset original; mudanças de padrão (por exemplo, migração para ICD-10) quebram o pré-processamento. Mitigação: validação de schema na entrada e fallback para imputação quando uma categoria nova aparece (\texttt{handle\_unknown="ignore"} no OneHotEncoder).
+\end{itemize}
+
+\subsection{Plano de monitoramento}
+\begin{itemize}
+  \item \textbf{Desempenho:} F1-macro e recall(\texttt{<30}) mensais sobre os pacientes com follow-up completo (rótulo disponível 30+ dias após a alta), estratificados por unidade e faixa etária.
+  \item \textbf{Drift de dados:} PSI semanal nas 15 variáveis de maior importância; PSI $>0{,}2$ em qualquer uma dispara revisão.
+  \item \textbf{Métricas de produto:} taxa de aceitação do alerta pela equipe clínica, taxa de comparecimento à consulta agendada motivada pelo alerta, e latência de inferência.
+\end{itemize}
+
+\subsection{Retreinamento e governança}
+O retreinamento é disparado quando: (a) o PSI ultrapassa $0{,}25$ em $\geq$3 das variáveis de maior peso, (b) o F1-macro mensal de produção cai mais de $0{,}05$ em relação ao F1-macro do teste reportado, ou (c) trimestralmente, como rotina. O pipeline de retreinamento reusa o \texttt{main.ipynb} (invalidando o cache do modelo vencedor), e o novo modelo entra em produção via \emph{canary release} de 10\% por duas semanas, com comparação A/B contra a versão vigente antes da promoção total. Cada versão de modelo é versionada junto com seu \texttt{cv\_results\_}, hiperparâmetros e métricas de teste, garantindo rastreabilidade e \emph{rollback}.
+
+\subsection{Limitações}
+O recall padrão da classe \texttt{<30} é baixo (0{,}196), o que torna a calibração de limiar indispensável, não opcional. A fronteira clínica de 30 dias é arbitrária, limitando o teto de desempenho independentemente do modelo (ver a discussão na Seção~5). Por fim, o modelo foi treinado em dados de 1999 a 2008 de hospitais americanos; sua transferência para outra população ou época exige revalidação antes do uso.
 
 \section{Reprodutibilidade e ferramentas}
 \subsection{Ferramentas}
@@ -169,6 +315,6 @@ uv run jupyter nbconvert --to notebook --execute main.ipynb \
 A primeira execução popula \texttt{reports/cv\_results/} (CSVs por modelo $\times$ variante) e \texttt{reports/figures/} (curvas, matriz, ROC/PR). Execuções subsequentes reusam o cache (\texttt{get\_or\_run\_search}).
 
 \subsection{Uso de IA generativa}
-Em conformidade com a Seção 14 das exigências, declaramos o uso do assistente de programação Claude (Anthropic, Opus 4.7) durante o desenvolvimento, para apoio em codificação, revisão e documentação. Decisões metodológicas (split estratificado, escolha de métrica, escolha de algoritmos e variantes, leitura crítica dos resultados, e revisão final deste relatório) foram conduzidas pela equipe.
+Em conformidade com a Seção 14 das exigências, declaramos o uso do assistente de programação Claude (Anthropic, Opus 4.7 e 4.8) durante o desenvolvimento, para apoio em codificação, revisão e documentação. Decisões metodológicas (split estratificado, escolha de métrica, escolha de algoritmos e variantes, leitura crítica dos resultados, e revisão final deste relatório) foram conduzidas pela equipe.
 
 \end{document}
