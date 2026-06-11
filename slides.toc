@@ -1,8 +1,0 @@
-\babel@toc {brazil}{}\relax 
-\beamer@sectionintoc {1}{Business Understanding}{2}{0}{1}
-\beamer@sectionintoc {2}{Data Understanding \& EDA}{3}{0}{2}
-\beamer@sectionintoc {3}{Data Preparation}{5}{0}{3}
-\beamer@sectionintoc {4}{Modeling}{6}{0}{4}
-\beamer@sectionintoc {5}{Evaluation}{8}{0}{5}
-\beamer@sectionintoc {6}{Deployment}{16}{0}{6}
-\beamer@sectionintoc {7}{Encerramento}{17}{0}{7}

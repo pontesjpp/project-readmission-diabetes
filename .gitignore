@@ -25,3 +25,14 @@ data/processed/*.parquet
 
 # Runtime logs (regenerados pelos scripts/run_*.py)
 logs/
+
+# LaTeX (artefatos intermediários — só os .pdf são entregáveis)
+*.aux
+*.log
+*.out
+*.toc
+*.nav
+*.snm
+*.fls
+*.fdb_latexmk
+*.synctex.gz
